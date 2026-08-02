@@ -1223,45 +1223,30 @@ MenuGroup:AddButton({
     Tooltip = "Cierra el menú y desactiva todas las funciones",
 })
 
--- ==================== AUTOFARM - UNDER SLAB ====================
-getgenv().UnderSlab = {
+-- ==================== MOVEMENT TAB ====================
+local MovementTab = Tabs.Movement
+
+-- ==================== PRESS FAST ====================
+getgenv().PressFast = {
     Enabled = false,
-    Depth = 25,
-    LookUp = true,
-    Freeze = false,
-    PositionLock = false,
-    SavedCFrame = nil,
-    TargetPos = nil,
-    LockCFrame = nil,
-    FastPrompt = true,
-    PromptHoldTime = 0.15
+    HoldTime = 0.15,
+    DiedPoint = nil,
+    TeleportOnRespawn = false
 }
 
 local OriginalPrompts = {}
 local PromptConnection = nil
+local DiedConnection = nil
 
-local function GetRoot()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    return char:FindFirstChild("HumanoidRootPart")
-end
-
-local function GetHumanoid()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    return char:FindFirstChildOfClass("Humanoid")
-end
-
--- ==================== FAST PROXIMITY PROMPT ====================
 local function ApplyFastPrompts()
-    if not getgenv().UnderSlab.FastPrompt then return end
+    if not getgenv().PressFast.Enabled then return end
     for _, prompt in ipairs(workspace:GetDescendants()) do
         if prompt:IsA("ProximityPrompt") then
             if OriginalPrompts[prompt] == nil then
                 OriginalPrompts[prompt] = prompt.HoldDuration
             end
             pcall(function()
-                prompt.HoldDuration = getgenv().UnderSlab.PromptHoldTime
+                prompt.HoldDuration = getgenv().PressFast.HoldTime
             end)
         end
     end
@@ -1281,14 +1266,13 @@ end
 local function StartPromptListener()
     if PromptConnection then return end
     PromptConnection = workspace.DescendantAdded:Connect(function(obj)
-        if not getgenv().UnderSlab.Enabled then return end
-        if not getgenv().UnderSlab.FastPrompt then return end
+        if not getgenv().PressFast.Enabled then return end
         if obj:IsA("ProximityPrompt") then
             if OriginalPrompts[obj] == nil then
                 OriginalPrompts[obj] = obj.HoldDuration
             end
             pcall(function()
-                obj.HoldDuration = getgenv().UnderSlab.PromptHoldTime
+                obj.HoldDuration = getgenv().PressFast.HoldTime
             end)
         end
     end)
@@ -1301,196 +1285,70 @@ local function StopPromptListener()
     end
 end
 
--- ==================== ENABLE / DISABLE ====================
-local function EnableUnderSlab()
-    local root = GetRoot()
-    local hum = GetHumanoid()
-    if not root or not hum then return end
-
-    -- Guardar sitio original (para volver al desactivar)
-    getgenv().UnderSlab.SavedCFrame = root.CFrame
-
-    local targetPos
-    if getgenv().UnderSlab.TargetPos then
-        targetPos = getgenv().UnderSlab.TargetPos - Vector3.new(0, getgenv().UnderSlab.Depth, 0)
-    else
-        targetPos = root.Position - Vector3.new(0, getgenv().UnderSlab.Depth, 0)
+local function ForceRespawn()
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.Health = 0
+        end
     end
-
-    local finalCF
-    if getgenv().UnderSlab.LookUp then
-        finalCF = CFrame.new(targetPos) * CFrame.Angles(math.rad(-50), 0, 0)
-    else
-        finalCF = CFrame.new(targetPos)
-    end
-
-    -- Teletransporte
-    root.CFrame = finalCF
-    getgenv().UnderSlab.LockCFrame = finalCF
-
-    -- Solo aplicar freeze si está activado
-    if getgenv().UnderSlab.Freeze then
-        root.Anchored = true
-        hum.PlatformStand = true
-    else
-        root.Anchored = false
-        hum.PlatformStand = false
-    end
-
-    ApplyFastPrompts()
-    StartPromptListener()
 end
 
-local function DisableUnderSlab()
+local function TeleportToDiedPoint()
+    if not getgenv().PressFast.DiedPoint then return end
     local root = GetRoot()
-    local hum = GetHumanoid()
-    if not root or not hum then return end
-
-    root.Anchored = false
-    hum.PlatformStand = false
-
-    -- Volver al lugar original
-    if getgenv().UnderSlab.SavedCFrame then
-        root.CFrame = getgenv().UnderSlab.SavedCFrame
-        getgenv().UnderSlab.SavedCFrame = nil
-    else
-        root.CFrame = root.CFrame + Vector3.new(0, getgenv().UnderSlab.Depth + 5, 0)
+    if root then
+        root.CFrame = CFrame.new(getgenv().PressFast.DiedPoint)
+        Library:Notify("Teleported to Died Point", 3)
     end
-
-    getgenv().UnderSlab.LockCFrame = nil
-
-    RestorePrompts()
-    StopPromptListener()
 end
 
--- ==================== HEARTBEAT ====================
--- Solo mantiene la posición si Position Lock o Freeze están ON.
--- Si los dos están OFF = solo fue un teletransporte, el personaje es normal.
-RunService.Heartbeat:Connect(function()
-    if not getgenv().UnderSlab.Enabled then return end
-
-    local root = GetRoot()
-    local hum = GetHumanoid()
-    if not root or not hum then return end
-    if not getgenv().UnderSlab.LockCFrame then return end
-
-    -- Position Lock: te deja fijo suave (sin Anchored)
-    if getgenv().UnderSlab.PositionLock then
-        root.CFrame = getgenv().UnderSlab.LockCFrame
-        root.AssemblyLinearVelocity = Vector3.zero
-        root.AssemblyAngularVelocity = Vector3.zero
+local function SetupDiedConnection()
+    if DiedConnection then
+        DiedConnection:Disconnect()
+        DiedConnection = nil
     end
-
-    -- Freeze: congelado total
-    if getgenv().UnderSlab.Freeze then
-        root.Anchored = true
-        hum.PlatformStand = true
-        root.CFrame = getgenv().UnderSlab.LockCFrame
-    end
-end)
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+    DiedConnection = hum.Died:Connect(function()
+        if getgenv().PressFast.TeleportOnRespawn and getgenv().PressFast.DiedPoint then
+            task.wait(0.8)
+            TeleportToDiedPoint()
+        end
+    end)
+end
 
 LocalPlayer.CharacterAdded:Connect(function()
-    if getgenv().UnderSlab.Enabled then
-        getgenv().UnderSlab.Enabled = false
-        getgenv().UnderSlab.SavedCFrame = nil
-        getgenv().UnderSlab.LockCFrame = nil
-        RestorePrompts()
-        StopPromptListener()
-        if Toggles and Toggles.UnderSlabEnabled then
-            Toggles.UnderSlabEnabled:SetValue(false)
-        end
+    task.wait(0.5)
+    SetupDiedConnection()
+    if getgenv().PressFast.TeleportOnRespawn and getgenv().PressFast.DiedPoint then
+        task.wait(0.6)
+        TeleportToDiedPoint()
     end
 end)
 
--- ==================== UI ====================
-local AutoFarmTab = Tabs.Autofarm
-local UnderBox = AutoFarmTab:AddLeftGroupbox("Under Slab", "arrow-down")
+local PressBox = MovementTab:AddLeftGroupbox("Press Fast", "zap")
 
-UnderBox:AddToggle("UnderSlabEnabled", {
-    Text = "Under Slab",
-    Default = false,
-    Tooltip = "Te teletransporta abajo. Al desactivar vuelves a tu sitio.",
-    Callback = function(v)
-        getgenv().UnderSlab.Enabled = v
-        if v then
-            EnableUnderSlab()
-        else
-            DisableUnderSlab()
-        end
-    end
-})
-
-UnderBox:AddSlider("UnderSlabDepth", {
-    Text = "Depth (Profundidad)",
-    Default = 25,
-    Min = 0,
-    Max = 100,
-    Rounding = 0,
-    Suffix = " studs",
-    Callback = function(v)
-        getgenv().UnderSlab.Depth = v
-    end
-})
-
-UnderBox:AddToggle("UnderSlabLookUp", {
-    Text = "Look Up",
-    Default = true,
-    Tooltip = "Te orienta mirando hacia arriba",
-    Callback = function(v)
-        getgenv().UnderSlab.LookUp = v
-    end
-})
-
-UnderBox:AddDivider()
-
-UnderBox:AddToggle("UnderSlabFreeze", {
-    Text = "Freeze Position",
-    Default = false,
-    Tooltip = "Te congela total (Anchored). Más estable, a veces afecta prompts.",
-    Callback = function(v)
-        getgenv().UnderSlab.Freeze = v
-        local root = GetRoot()
-        local hum = GetHumanoid()
-        if root and hum and getgenv().UnderSlab.Enabled then
-            if v then
-                root.Anchored = true
-                hum.PlatformStand = true
-            else
-                root.Anchored = false
-                hum.PlatformStand = false
-            end
-        end
-    end
-})
-
-UnderBox:AddToggle("UnderSlabPositionLock", {
-    Text = "Position Lock",
-    Default = false,
-    Tooltip = "Te deja fijo suave sin Anchored (mejor para hablar con NPCs).",
-    Callback = function(v)
-        getgenv().UnderSlab.PositionLock = v
-    end
-})
-
-UnderBox:AddDivider()
-
-UnderBox:AddToggle("UnderSlabFastPrompt", {
+PressBox:AddToggle("PressFastEnabled", {
     Text = "Fast Proximity Prompt",
-    Default = true,
-    Tooltip = "Reduce el tiempo de hold de los prompts solo con Under Slab activo",
+    Default = false,
+    Tooltip = "Reduce el tiempo de hold de todos los ProximityPrompts",
     Callback = function(v)
-        getgenv().UnderSlab.FastPrompt = v
-        if getgenv().UnderSlab.Enabled then
-            if v then
-                ApplyFastPrompts()
-            else
-                RestorePrompts()
-            end
+        getgenv().PressFast.Enabled = v
+        if v then
+            ApplyFastPrompts()
+            StartPromptListener()
+        else
+            RestorePrompts()
+            StopPromptListener()
         end
     end
 })
 
-UnderBox:AddSlider("UnderSlabPromptTime", {
+PressBox:AddSlider("PressFastHoldTime", {
     Text = "Prompt Hold Time",
     Default = 0.15,
     Min = 0.05,
@@ -1498,42 +1356,359 @@ UnderBox:AddSlider("UnderSlabPromptTime", {
     Rounding = 2,
     Suffix = "s",
     Callback = function(v)
-        getgenv().UnderSlab.PromptHoldTime = v
-        if getgenv().UnderSlab.Enabled and getgenv().UnderSlab.FastPrompt then
+        getgenv().PressFast.HoldTime = v
+        if getgenv().PressFast.Enabled then
             ApplyFastPrompts()
         end
     end
 })
 
-UnderBox:AddDivider()
+PressBox:AddDivider()
 
-UnderBox:AddButton({
-    Text = "Set Position",
+PressBox:AddButton({
+    Text = "Force Respawn",
     Func = function()
-        local root = GetRoot()
-        if not root then
-            Library:Notify("No se encontró el personaje", 3)
-            return
-        end
-        getgenv().UnderSlab.TargetPos = root.Position
-        local pos = root.Position
-        Library:Notify(string.format("Posición guardada: %.1f, %.1f, %.1f", pos.X, pos.Y, pos.Z), 4)
+        ForceRespawn()
+        Library:Notify("Respawn forzado", 2)
     end,
-    Tooltip = "Guarda la posición a la que irás al activar Under Slab"
+    Tooltip = "Te mata para respawnear"
 })
 
-UnderBox:AddButton({
-    Text = "Clear Position",
-    Func = function()
-        getgenv().UnderSlab.TargetPos = nil
-        Library:Notify("Posición eliminada", 3)
+PressBox:AddToggle("PressFastTeleportOnRespawn", {
+    Text = "Teleport on Respawn",
+    Default = false,
+    Tooltip = "Al respawnear te lleva automáticamente al Died Point",
+    Callback = function(v)
+        getgenv().PressFast.TeleportOnRespawn = v
     end
 })
 
-print("[AUTOFARM] Under Slab cargado")
+if LocalPlayer.Character then
+    SetupDiedConnection()
+end
 
+print("[PRESS FAST] Cargado en Movement")
 
--- ==================== AUTOFARM - MARSHMALLOW ====================
+-- ==================== MINI SKIP ====================
+getgenv().MiniSkip = {
+    Distance = 5,
+    Cooldown = 0.3,
+    ShowFloatingButton = false
+}
+
+local lastSkip = 0
+local FloatingButtonGui = nil
+
+local function DoMiniSkip()
+    if tick() - lastSkip < (getgenv().MiniSkip.Cooldown or 0.3) then return end
+    lastSkip = tick()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local look = root.CFrame.LookVector
+    local dist = getgenv().MiniSkip.Distance or 5
+    local newPos = root.Position + (look * dist)
+    root.CFrame = CFrame.new(newPos, newPos + look)
+end
+
+local function CreateFloatingButton()
+    if FloatingButtonGui then
+        FloatingButtonGui:Destroy()
+        FloatingButtonGui = nil
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "MiniSkipFloating"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.IgnoreGuiInset = true
+    screenGui.Parent = CoreGui
+
+    local frame = Instance.new("Frame")
+    frame.Name = "SkipFrame"
+    frame.Size = UDim2.new(0, 95, 0, 42)
+    frame.Position = UDim2.new(1, -115, 1, -160)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    frame.BackgroundTransparency = 0.05
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(60, 60, 70)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.3
+    stroke.Parent = frame
+
+    local button = Instance.new("TextButton")
+    button.Name = "SkipButton"
+    button.Size = UDim2.new(1, 0, 1, 0)
+    button.BackgroundTransparency = 1
+    button.Text = "Mini Skip"
+    button.TextColor3 = Color3.fromRGB(230, 230, 235)
+    button.TextSize = 14
+    button.Font = Enum.Font.GothamMedium
+    button.AutoButtonColor = false
+    button.Parent = frame
+
+    button.MouseEnter:Connect(function()
+        frame.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    end)
+    button.MouseLeave:Connect(function()
+        frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    end)
+    button.MouseButton1Down:Connect(function()
+        frame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+    end)
+    button.MouseButton1Up:Connect(function()
+        frame.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+    end)
+
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+
+    button.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    button.MouseButton1Click:Connect(function()
+        DoMiniSkip()
+    end)
+
+    FloatingButtonGui = screenGui
+end
+
+local function DestroyFloatingButton()
+    if FloatingButtonGui then
+        FloatingButtonGui:Destroy()
+        FloatingButtonGui = nil
+    end
+end
+
+local SkipBox = MovementTab:AddLeftGroupbox("Mini Skip", "move")
+
+SkipBox:AddSlider("MiniSkipDistance", {
+    Text = "Distance",
+    Default = 5,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Suffix = " studs",
+    Callback = function(Value)
+        getgenv().MiniSkip.Distance = Value
+    end
+})
+
+SkipBox:AddToggle("MiniSkipFloating", {
+    Text = "Show Floating Button",
+    Default = false,
+    Tooltip = "Muestra un botón permanente con el estilo de la Library",
+    Callback = function(Value)
+        getgenv().MiniSkip.ShowFloatingButton = Value
+        if Value then
+            CreateFloatingButton()
+        else
+            DestroyFloatingButton()
+        end
+    end
+})
+
+SkipBox:AddButton({
+    Text = "Skip Now",
+    Func = function()
+        DoMiniSkip()
+    end,
+    Tooltip = "Te mueve un poco hacia adelante"
+})
+
+print("[MINI SKIP] Cargado en Movement")
+
+-- ==================== AUTO LOOT + AUTO PRESS ====================
+getgenv().AutoLoot = {
+    Enabled = false,
+    AutoPressAny = false,
+    MaxDistance = 14,
+    OnlyDead = true,
+    Key = Enum.KeyCode.E
+}
+
+local IsHolding = false
+local CachedPrompts = {}
+local LastCacheUpdate = 0
+
+local function IsDead(character)
+    local hum = character and character:FindFirstChildOfClass("Humanoid")
+    return hum and hum.Health <= 0
+end
+
+local function UpdatePromptCache()
+    table.clear(CachedPrompts)
+    for _, obj in ipairs(workspace:GetDescendants()) do
+        if obj:IsA("ProximityPrompt") and obj.Enabled then
+            table.insert(CachedPrompts, obj)
+        end
+    end
+    LastCacheUpdate = tick()
+end
+
+local function HoldPrompt(prompt)
+    if IsHolding or not prompt then return end
+    IsHolding = true
+
+    local holdTime = math.max(prompt.HoldDuration or 0.5, 0.05)
+
+    VIM:SendKeyEvent(true, getgenv().AutoLoot.Key, false, game)
+    task.wait(holdTime)
+    VIM:SendKeyEvent(false, getgenv().AutoLoot.Key, false, game)
+
+    task.wait(0.08)
+    IsHolding = false
+end
+
+local function TryAutoInteract()
+    if IsHolding then return end
+    if not getgenv().AutoLoot.Enabled and not getgenv().AutoLoot.AutoPressAny then
+        return
+    end
+
+    local myRoot = GetRoot()
+    if not myRoot then return end
+
+    if tick() - LastCacheUpdate > 1.2 then
+        UpdatePromptCache()
+    end
+
+    local closestPrompt = nil
+    local closestDist = getgenv().AutoLoot.MaxDistance
+
+    if getgenv().AutoLoot.Enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                local char = player.Character
+                if getgenv().AutoLoot.OnlyDead and not IsDead(char) then
+                    continue
+                end
+
+                for _, obj in ipairs(char:GetDescendants()) do
+                    if obj:IsA("ProximityPrompt") and obj.Enabled then
+                        local part = obj.Parent
+                        if part and part:IsA("BasePart") then
+                            local dist = (myRoot.Position - part.Position).Magnitude
+                            if dist < closestDist then
+                                closestDist = dist
+                                closestPrompt = obj
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if getgenv().AutoLoot.AutoPressAny and not closestPrompt then
+        for _, prompt in ipairs(CachedPrompts) do
+            if prompt and prompt.Parent and prompt.Enabled then
+                local part = prompt.Parent
+                if part:IsA("BasePart") then
+                    local dist = (myRoot.Position - part.Position).Magnitude
+                    if dist < closestDist then
+                        closestDist = dist
+                        closestPrompt = prompt
+                    end
+                end
+            end
+        end
+    end
+
+    if closestPrompt then
+        HoldPrompt(closestPrompt)
+    end
+end
+
+task.spawn(function()
+    while true do
+        task.wait(0.05)
+        pcall(TryAutoInteract)
+    end
+end)
+
+local LootBox = MovementTab:AddRightGroupbox("Auto Loot / Press", "backpack")
+
+LootBox:AddToggle("AutoLootEnabled", {
+    Text = "Auto Loot (Muertos)",
+    Default = false,
+    Tooltip = "Lootear automáticamente jugadores muertos cercanos",
+    Callback = function(v)
+        getgenv().AutoLoot.Enabled = v
+        Library:Notify(v and "Auto Loot activado" or "Auto Loot desactivado", 2)
+    end
+})
+
+LootBox:AddToggle("AutoPressAny", {
+    Text = "Auto Press Any Prompt",
+    Default = false,
+    Tooltip = "Mantiene presionada la E el tiempo completo del prompt y vuelve a hacerlo",
+    Callback = function(v)
+        getgenv().AutoLoot.AutoPressAny = v
+        if v then
+            UpdatePromptCache()
+        end
+        Library:Notify(v and "Auto Press Any activado" or "Auto Press Any desactivado", 2)
+    end
+})
+
+LootBox:AddDivider()
+
+LootBox:AddSlider("AutoLootDistance", {
+    Text = "Max Distance",
+    Default = 14,
+    Min = 6,
+    Max = 25,
+    Rounding = 0,
+    Suffix = " studs",
+    Callback = function(v)
+        getgenv().AutoLoot.MaxDistance = v
+    end
+})
+
+LootBox:AddToggle("AutoLootOnlyDead", {
+    Text = "Only Dead Players",
+    Default = true,
+    Callback = function(v)
+        getgenv().AutoLoot.OnlyDead = v
+    end
+})
+
+print("[AUTO LOOT + AUTO PRESS] Cargado en Movement")
+
+-- ==================== AUTOFARM - MARSHMALLOW (se queda en Auto Farm) ====================
 getgenv().MarshFarm = {
     Enabled = false,
     Running = false,
@@ -1548,6 +1723,7 @@ getgenv().MarshFarm = {
 }
 
 local lastNotify = 0
+
 local function Notify(title, text, time)
     if not getgenv().MarshFarm.NotifyEnabled then return end
     if tick() - lastNotify < (getgenv().MarshFarm.NotifyCooldown or 0.8) then return end
@@ -1571,11 +1747,11 @@ end
 local function PressE()
     for i = 1, 3 do
         pcall(function()
-            game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
         end)
         task.wait(0.07)
         pcall(function()
-            game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
         end)
         task.wait(0.06)
     end
@@ -1678,7 +1854,6 @@ end
 local function FarmLoop()
     if getgenv().MarshFarm.Running then return end
     getgenv().MarshFarm.Running = true
-
     local cycle = 0
     local maxCycles = GetMaxCycles()
     local timePerCycle = GetTimePerCycle()
@@ -1689,9 +1864,7 @@ local function FarmLoop()
 
     while getgenv().MarshFarm.Enabled and getgenv().MarshFarm.Running do
         local ok, missing = HasItems()
-
         if not ok then
-            -- ===== RECUPERACIÓN =====
             Notify("Auto Farm", "Intentando recuperar ciclo...", 3)
             local recovered = false
 
@@ -1749,7 +1922,6 @@ local function FarmLoop()
             end
             task.wait(0.8)
         else
-            -- ===== CICLO NORMAL =====
             cycle += 1
             local remainingCycles = math.max(maxCycles - cycle, 0)
             local remainingTime = remainingCycles * timePerCycle
@@ -1759,7 +1931,6 @@ local function FarmLoop()
                 cycle, maxCycles, FormatTime(remainingTime)
             ), 3)
 
-            -- 1. WATER
             if EquipTool(getgenv().MarshFarm.Water) then
                 task.wait(0.35)
                 PressE()
@@ -1770,18 +1941,18 @@ local function FarmLoop()
                     task.wait(0.3)
                 end
             end
+
             if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
 
-            -- 2. SUGAR BLOCK BAG
             if EquipTool(getgenv().MarshFarm.SugarBlock) then
                 task.wait(0.35)
                 PressE()
                 Notify("Auto Farm", "Sugar Block Bag usado", 2)
                 task.wait(0.4)
             end
+
             if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
 
-            -- 3. GELATIN
             if EquipTool(getgenv().MarshFarm.Gelatin) then
                 task.wait(0.35)
                 PressE()
@@ -1792,9 +1963,9 @@ local function FarmLoop()
                     task.wait(0.3)
                 end
             end
+
             if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
 
-            -- 4. EMPTY BAG
             if FindTool(getgenv().MarshFarm.EmptyBag) then
                 if EquipTool(getgenv().MarshFarm.EmptyBag) then
                     task.wait(0.35)
@@ -1823,21 +1994,17 @@ local function StartFarm()
         Notify("Auto Farm", "Ya está corriendo", 2)
         return
     end
-
     local ok, missing = HasItems()
     if not ok then
         Notify("Auto Farm", "Faltan items: " .. table.concat(missing, ", "), 4)
         return
     end
-
     local maxCycles = GetMaxCycles()
     local totalSeconds = maxCycles * GetTimePerCycle()
-
     Notify("Auto Farm", string.format(
         "Ingredientes detectados → %d ciclos\nTiempo estimado: %s",
         maxCycles, FormatTime(totalSeconds)
     ), 6)
-
     task.spawn(FarmLoop)
 end
 
@@ -1850,9 +2017,8 @@ local function StopFarm()
     Notify("Auto Farm", "Deteniendo farm...", 2)
 end
 
--- ==================== UI ====================
 local AutoFarmTab = Tabs.Autofarm
-local MarshTabBox = AutoFarmTab:AddRightTabbox()
+local MarshTabBox = AutoFarmTab:AddLeftTabbox()
 local ControlsTab = MarshTabBox:AddTab("Controls", "play")
 local SettingsTab = MarshTabBox:AddTab("Settings", "settings")
 
@@ -1958,80 +2124,6 @@ SettingsTab:AddLabel("3. Gelatin → E → espera")
 SettingsTab:AddLabel("4. Empty Bag → E → listo")
 
 print("[AUTOFARM] Marshmallow completo cargado")
-
--- ==================== MINI SKIP ====================
-getgenv().MiniSkip = {
-    Distance = 5,
-    Cooldown = 0.3
-}
-
-local lastSkip = 0
-
-local function DoMiniSkip()
-    if tick() - lastSkip < (getgenv().MiniSkip.Cooldown or 0.3) then return end
-    lastSkip = tick()
-
-    local char = LocalPlayer.Character
-    if not char then return end
-
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-
-    local look = root.CFrame.LookVector
-    local dist = getgenv().MiniSkip.Distance or 5
-    local newPos = root.Position + (look * dist)
-
-    root.CFrame = CFrame.new(newPos, newPos + look)
-end
-
--- UI
-local AutoFarmTab = Tabs.Autofarm
-local SkipBox = AutoFarmTab:AddLeftGroupbox("Mini Skip", "move")
-
-SkipBox:AddSlider("MiniSkipDistance", {
-    Text = "Distance",
-    Default = 5,
-    Min = 1,
-    Max = 10,
-    Rounding = 0,
-    Suffix = " studs",
-    Callback = function(Value)
-        getgenv().MiniSkip.Distance = Value
-    end
-})
-
-SkipBox:AddButton({
-    Text = "Skip Now",
-    Func = function()
-        DoMiniSkip()
-    end,
-    Tooltip = "Te mueve un poco hacia adelante"
-})
-
-SkipBox:AddLabel("Keybind"):AddKeyPicker("MiniSkipKey", {
-    Default = "None",
-    Mode = "Press",
-    Text = "Mini Skip",
-    NoUI = false,
-    SyncToggleState = false,
-    Callback = function()
-        DoMiniSkip()
-    end
-})
-
-SkipBox:AddButton({
-    Text = "Reset Key",
-    Func = function()
-        if Options and Options.MiniSkipKey then
-            Options.MiniSkipKey:SetValue({ "None", "Press" })
-            Library:Notify("Mini Skip keybind reseteado", 3)
-        end
-    end,
-    Tooltip = "Deja el keybind en None"
-})
-
-print("[AUTOFARM] Mini Skip cargado")
-
 
 Library.ToggleKeybind = Options.MenuKeybind
 
