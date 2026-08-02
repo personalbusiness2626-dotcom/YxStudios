@@ -1,0 +1,23 @@
+{
+  "NYX-TEMP-1A2B-3C4D-5E6F": {
+    "UserID": "123456789",
+    "Duration": 86400,
+    "Type": "1d",
+    "ActivatedAt": null,
+    "ExpiresAt": null
+  },
+  "NYX-TEMP-ABCD-EFGH-IJKL": {
+    "UserID": "987654321",
+    "Duration": 259200,
+    "Type": "3d",
+    "ActivatedAt": 1737216000,
+    "ExpiresAt": 1737475200
+  },
+  "NYX-TEMP-MNOP-QRST-UVWX": {
+    "UserID": "555555555",
+    "Duration": 604800,
+    "Type": "7d",
+    "ActivatedAt": null,
+    "ExpiresAt": null
+  }
+}
