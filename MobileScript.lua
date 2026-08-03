@@ -19,12 +19,699 @@ local Window = Library:CreateWindow({
 })
 
 local Tabs = {
-    ["Combat"] = Window:AddTab("Combat", "sword"),
-    ["Movement"] = Window:AddTab("Movement", "footprints"),
-    ESP = Window:AddTab("Player", "eye"),
-    Autofarm = Window:AddTab("Auto Farm", "package"),
+    ["Combat"] = Window:AddTab("Combat", "swords"),
+    ["Movement"] = Window:AddTab("Player", "user"),
+    ESP = Window:AddTab("Visuals", "view"),
+    Autofarm = Window:AddTab("Auto Farm", "tickets"),
     ["UI Settings"] = Window:AddTab("Settings", "settings"),
 }
+
+-- ==================== TAB COMBAT ====================
+-- ==================== COMBAT TAB - AIMLOCK + ADVANCED FOV (MOBILE + FLOATING BUTTON) ====================
+getgenv().Aimlock = {
+    Enabled = false,
+    Aiming = false,
+    Part = "Head",
+    OldPart = "Head",
+    Radius = 150,
+    MaxDistance = 50,
+    TeamCheck = false,
+    Predict = false,
+    Prediction = 15,
+    Smooth = 0,
+    AliveCheck = false,
+    Airshot = false,
+    Sticky = true,
+    WallCheck = false,
+    TargetIndicator = false,
+    AutoSwitch = false,
+    ShowFloatingButton = false
+}
+
+getgenv().FOV = {
+    Enabled = false,
+    Radius = 150,
+    Color = Color3.fromRGB(255, 0, 70),
+    Thickness = 1.6,
+    Transparency = 0.15,
+    Filled = false,
+    FillTransparency = 0.7,
+    NumSides = 64,
+    Glow = false,
+    Rainbow = false,
+    Pulse = false,
+    OnlyWhenAiming = false,
+    FollowMouse = true,
+    TargetColor = false,
+    LockedColor = Color3.fromRGB(0, 255, 100)
+}
+
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local CoreGui = game:GetService("CoreGui")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Target = nil
+local LockedTarget = nil
+
+-- ==================== FOV DRAWINGS ====================
+local FOVCircle = Drawing.new("Circle")
+FOVCircle.Radius = 150
+FOVCircle.Color = Color3.fromRGB(255, 0, 70)
+FOVCircle.Thickness = 1.6
+FOVCircle.NumSides = 64
+FOVCircle.Filled = false
+FOVCircle.Transparency = 0.9
+FOVCircle.Visible = false
+FOVCircle.ZIndex = 10
+
+local FOVGlow = Drawing.new("Circle")
+FOVGlow.Radius = 150
+FOVGlow.Color = Color3.fromRGB(255, 0, 70)
+FOVGlow.Thickness = 4
+FOVGlow.NumSides = 64
+FOVGlow.Filled = false
+FOVGlow.Transparency = 0.7
+FOVGlow.Visible = false
+FOVGlow.ZIndex = 9
+
+-- ==================== TARGET INDICATOR ====================
+local TargetHighlight = Instance.new("Highlight")
+TargetHighlight.Name = "AimlockTargetIndicator"
+TargetHighlight.FillColor = Color3.fromRGB(255, 50, 50)
+TargetHighlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+TargetHighlight.FillTransparency = 0.6
+TargetHighlight.OutlineTransparency = 0
+TargetHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+TargetHighlight.Enabled = false
+TargetHighlight.Parent = CoreGui
+
+-- ==================== ANIMATION VARIABLES ====================
+local rainbowValue = 0
+local pulseValue = 0
+local pulseDirection = 1
+
+-- ==================== FLOATING BUTTON ====================
+local AimFloatingGui = nil
+
+local function UpdateFloatingButtonVisual()
+    if not AimFloatingGui then return end
+    local frame = AimFloatingGui:FindFirstChild("AimFrame")
+    local button = frame and frame:FindFirstChild("AimButton")
+    if not frame or not button then return end
+
+    if getgenv().Aimlock.Enabled and getgenv().Aimlock.Aiming then
+        frame.BackgroundColor3 = Color3.fromRGB(0, 140, 70)
+        button.Text = "Aim ON"
+        button.TextColor3 = Color3.fromRGB(255, 255, 255)
+    else
+        frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        button.Text = "Aim OFF"
+        button.TextColor3 = Color3.fromRGB(230, 230, 235)
+    end
+end
+
+local function CreateAimFloatingButton()
+    if AimFloatingGui then
+        AimFloatingGui:Destroy()
+        AimFloatingGui = nil
+    end
+
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "AimlockFloating"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    screenGui.IgnoreGuiInset = true
+    screenGui.Parent = CoreGui
+
+    local frame = Instance.new("Frame")
+    frame.Name = "AimFrame"
+    frame.Size = UDim2.new(0, 95, 0, 42)
+    frame.Position = UDim2.new(1, -115, 1, -220)
+    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+    frame.BackgroundTransparency = 0.05
+    frame.BorderSizePixel = 0
+    frame.Parent = screenGui
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 8)
+    corner.Parent = frame
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Color3.fromRGB(60, 60, 70)
+    stroke.Thickness = 1
+    stroke.Transparency = 0.3
+    stroke.Parent = frame
+
+    local button = Instance.new("TextButton")
+    button.Name = "AimButton"
+    button.Size = UDim2.new(1, 0, 1, 0)
+    button.BackgroundTransparency = 1
+    button.Text = "Aim OFF"
+    button.TextColor3 = Color3.fromRGB(230, 230, 235)
+    button.TextSize = 14
+    button.Font = Enum.Font.GothamMedium
+    button.AutoButtonColor = false
+    button.Parent = frame
+
+    button.MouseEnter:Connect(function()
+        if not (getgenv().Aimlock.Enabled and getgenv().Aimlock.Aiming) then
+            frame.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
+        end
+    end)
+
+    button.MouseLeave:Connect(function()
+        UpdateFloatingButtonVisual()
+    end)
+
+    button.MouseButton1Down:Connect(function()
+        if not (getgenv().Aimlock.Enabled and getgenv().Aimlock.Aiming) then
+            frame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
+        end
+    end)
+
+    button.MouseButton1Up:Connect(function()
+        UpdateFloatingButtonVisual()
+    end)
+
+    local dragging = false
+    local dragStart = nil
+    local startPos = nil
+
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = frame.Position
+        end
+    end)
+
+    button.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = false
+        end
+    end)
+
+    UserInputService.InputChanged:Connect(function(input)
+        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
+            local delta = input.Position - dragStart
+            frame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    button.MouseButton1Click:Connect(function()
+        local newState = not (getgenv().Aimlock.Enabled and getgenv().Aimlock.Aiming)
+        getgenv().Aimlock.Enabled = newState
+        getgenv().Aimlock.Aiming = newState
+
+        if not newState then
+            Target = nil
+            LockedTarget = nil
+            TargetHighlight.Enabled = false
+            TargetHighlight.Adornee = nil
+        end
+
+        UpdateFloatingButtonVisual()
+    end)
+
+    AimFloatingGui = screenGui
+    UpdateFloatingButtonVisual()
+end
+
+local function DestroyAimFloatingButton()
+    if AimFloatingGui then
+        AimFloatingGui:Destroy()
+        AimFloatingGui = nil
+    end
+end
+
+-- ==================== FUNCTIONS ====================
+local function GetDistance(player)
+    local myChar = LocalPlayer.Character
+    local theirChar = player.Character
+    if not myChar or not theirChar then return 999999 end
+    local myRoot = myChar:FindFirstChild("HumanoidRootPart")
+    local theirRoot = theirChar:FindFirstChild("HumanoidRootPart")
+    if not myRoot or not theirRoot then return 999999 end
+    return (myRoot.Position - theirRoot.Position).Magnitude
+end
+
+local function IsVisible(part)
+    if not part then return false end
+    local origin = Camera.CFrame.Position
+    local direction = (part.Position - origin)
+    local rayParams = RaycastParams.new()
+    rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+    rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
+    local result = workspace:Raycast(origin, direction, rayParams)
+    if result then
+        local hitChar = result.Instance:FindFirstAncestorOfClass("Model")
+        if hitChar and hitChar:FindFirstChild("Humanoid") then
+            return true
+        end
+        return false
+    end
+    return true
+end
+
+local function GetClosest()
+    local closest = nil
+    local bestScore = math.huge
+    local screenCenter = Camera.ViewportSize / 2
+
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
+            if getgenv().Aimlock.TeamCheck and plr.Team == LocalPlayer.Team then
+                continue
+            end
+
+            local part = plr.Character:FindFirstChild(getgenv().Aimlock.Part) or plr.Character:FindFirstChild("Head")
+            if part then
+                local sp, onscreen = Camera:WorldToViewportPoint(part.Position)
+                if onscreen then
+                    local screenDist = (Vector2.new(sp.X, sp.Y) - screenCenter).Magnitude
+
+                    if screenDist > getgenv().Aimlock.Radius then
+                        continue
+                    end
+
+                    local worldDist = GetDistance(plr)
+                    if worldDist > getgenv().Aimlock.MaxDistance then
+                        continue
+                    end
+
+                    if getgenv().Aimlock.WallCheck and not IsVisible(part) then
+                        continue
+                    end
+
+                    local score = (worldDist * 2) + (screenDist * 0.35)
+                    if score < bestScore then
+                        bestScore = score
+                        closest = plr
+                    end
+                end
+            end
+        end
+    end
+    return closest
+end
+
+-- ==================== FOV LOOP ====================
+RunService.RenderStepped:Connect(function(dt)
+    local cfg = getgenv().FOV
+    local shouldShow = cfg.Enabled
+
+    if cfg.OnlyWhenAiming then
+        shouldShow = shouldShow and getgenv().Aimlock.Enabled and getgenv().Aimlock.Aiming
+    end
+
+    if not shouldShow then
+        FOVCircle.Visible = false
+        FOVGlow.Visible = false
+        return
+    end
+
+    local pos
+    if cfg.FollowMouse then
+        pos = Vector2.new(Mouse.X, Mouse.Y + 36)
+    else
+        pos = Camera.ViewportSize / 2
+    end
+
+    local finalColor = cfg.Color
+    if cfg.Rainbow then
+        rainbowValue = (rainbowValue + dt * 0.4) % 1
+        finalColor = Color3.fromHSV(rainbowValue, 1, 1)
+    elseif cfg.TargetColor and Target then
+        finalColor = cfg.LockedColor
+    end
+
+    local finalRadius = cfg.Radius
+    if cfg.Pulse then
+        pulseValue = pulseValue + (dt * pulseDirection * 30)
+        if pulseValue >= 12 then
+            pulseValue = 12
+            pulseDirection = -1
+        elseif pulseValue <= -12 then
+            pulseValue = -12
+            pulseDirection = 1
+        end
+        finalRadius = cfg.Radius + pulseValue
+    end
+
+    FOVCircle.Position = pos
+    FOVCircle.Radius = finalRadius
+    FOVCircle.Color = finalColor
+    FOVCircle.Thickness = cfg.Thickness
+    FOVCircle.NumSides = cfg.NumSides
+    FOVCircle.Filled = cfg.Filled
+    FOVCircle.Transparency = cfg.Filled and cfg.FillTransparency or cfg.Transparency
+    FOVCircle.Visible = true
+
+    if cfg.Glow then
+        FOVGlow.Position = pos
+        FOVGlow.Radius = finalRadius
+        FOVGlow.Color = finalColor
+        FOVGlow.Transparency = 0.75
+        FOVGlow.Visible = true
+    else
+        FOVGlow.Visible = false
+    end
+end)
+
+-- ==================== AIMLOCK LOOP ====================
+RunService.Heartbeat:Connect(function()
+    if not getgenv().Aimlock.Enabled or not getgenv().Aimlock.Aiming then
+        Target = nil
+        LockedTarget = nil
+        TargetHighlight.Enabled = false
+        TargetHighlight.Adornee = nil
+        return
+    end
+
+    if getgenv().Aimlock.Sticky then
+        if not LockedTarget or not LockedTarget.Parent or not LockedTarget.Character or not LockedTarget.Character:FindFirstChild("Humanoid") or LockedTarget.Character.Humanoid.Health <= 0 then
+            if getgenv().Aimlock.AutoSwitch or not LockedTarget then
+                LockedTarget = GetClosest()
+            else
+                LockedTarget = nil
+            end
+        end
+        Target = LockedTarget
+    else
+        Target = GetClosest()
+        LockedTarget = Target
+    end
+
+    if getgenv().Aimlock.AliveCheck and Target and Target.Character and Target.Character:FindFirstChild("Humanoid") then
+        if Target.Character.Humanoid.Health <= 0 then
+            Target = nil
+            LockedTarget = nil
+        end
+    end
+
+    if getgenv().Aimlock.Airshot and Target and Target.Character and Target.Character:FindFirstChild("Humanoid") then
+        if Target.Character.Humanoid.FloorMaterial == Enum.Material.Air then
+            getgenv().Aimlock.Part = "RightFoot"
+        else
+            getgenv().Aimlock.Part = getgenv().Aimlock.OldPart
+        end
+    end
+
+    if getgenv().Aimlock.TargetIndicator and Target and Target.Character then
+        TargetHighlight.Adornee = Target.Character
+        TargetHighlight.Enabled = true
+    else
+        TargetHighlight.Enabled = false
+        TargetHighlight.Adornee = nil
+    end
+
+    if Target and Target.Character and Target.Character:FindFirstChild(getgenv().Aimlock.Part) then
+        local part = Target.Character[getgenv().Aimlock.Part]
+        local pos = part.Position
+
+        if getgenv().Aimlock.Predict then
+            pos = pos + (part.Velocity / getgenv().Aimlock.Prediction)
+        end
+
+        if getgenv().Aimlock.Smooth > 0 then
+            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, pos), getgenv().Aimlock.Smooth)
+        else
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, pos)
+        end
+    end
+end)
+
+-- ==================== UI - AIMLOCK (MOBILE) ====================
+local AimBox = Tabs.Combat:AddLeftGroupbox("Aimlock (Mobile)", "sword")
+
+AimBox:AddToggle("AimlockEnabled", {
+    Text = "Aim Assist",
+    Default = false,
+    Tooltip = "Turn on to start aiming",
+    Callback = function(Value)
+        getgenv().Aimlock.Enabled = Value
+        getgenv().Aimlock.Aiming = Value
+
+        if not Value then
+            Target = nil
+            LockedTarget = nil
+            TargetHighlight.Enabled = false
+            TargetHighlight.Adornee = nil
+        end
+
+        UpdateFloatingButtonVisual()
+    end
+})
+
+AimBox:AddToggle("ShowAimFloating", {
+    Text = "Show Floating Button",
+    Default = false,
+    Tooltip = "Shows a permanent toggle button on screen",
+    Callback = function(Value)
+        getgenv().Aimlock.ShowFloatingButton = Value
+        if Value then
+            CreateAimFloatingButton()
+        else
+            DestroyAimFloatingButton()
+        end
+    end
+})
+
+AimBox:AddDropdown("AimPart", {
+    Values = {"Head", "UpperTorso", "HumanoidRootPart", "LowerTorso"},
+    Default = 1,
+    Text = "Aim Part",
+    Callback = function(v)
+        getgenv().Aimlock.Part = v
+        getgenv().Aimlock.OldPart = v
+    end
+})
+
+AimBox:AddToggle("StickyAim", {
+    Text = "Sticky Aim",
+    Default = true,
+    Tooltip = "Stays locked on target",
+    Callback = function(v) getgenv().Aimlock.Sticky = v end
+})
+
+AimBox:AddToggle("WallCheck", {
+    Text = "Wall Check",
+    Default = false,
+    Tooltip = "Only aims at visible players",
+    Callback = function(v) getgenv().Aimlock.WallCheck = v end
+})
+
+AimBox:AddToggle("AutoSwitch", {
+    Text = "Auto Switch",
+    Default = false,
+    Tooltip = "Switches target when they die",
+    Callback = function(v) getgenv().Aimlock.AutoSwitch = v end
+})
+
+AimBox:AddToggle("TargetIndicator", {
+    Text = "Target Indicator",
+    Default = false,
+    Tooltip = "Highlights the player you're aiming at",
+    Callback = function(v)
+        getgenv().Aimlock.TargetIndicator = v
+        if not v then
+            TargetHighlight.Enabled = false
+            TargetHighlight.Adornee = nil
+        end
+    end
+})
+
+AimBox:AddToggle("TeamCheck", {
+    Text = "Team Check",
+    Default = false,
+    Callback = function(v) getgenv().Aimlock.TeamCheck = v end
+})
+
+AimBox:AddToggle("AliveCheck", {
+    Text = "Alive Check",
+    Default = false,
+    Callback = function(v) getgenv().Aimlock.AliveCheck = v end
+})
+
+AimBox:AddToggle("Prediction", {
+    Text = "Prediction",
+    Default = false,
+    Callback = function(v) getgenv().Aimlock.Predict = v end
+})
+
+AimBox:AddToggle("Airshot", {
+    Text = "Airshot Function",
+    Default = false,
+    Callback = function(v) getgenv().Aimlock.Airshot = v end
+})
+
+AimBox:AddSlider("Smoothness", {
+    Text = "Smoothness",
+    Default = 0,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(v) getgenv().Aimlock.Smooth = v end
+})
+
+AimBox:AddSlider("PredictionPower", {
+    Text = "Prediction Movement",
+    Default = 15,
+    Min = 1,
+    Max = 50,
+    Rounding = 1,
+    Callback = function(v) getgenv().Aimlock.Prediction = v end
+})
+
+AimBox:AddSlider("AimRadius", {
+    Text = "Aim Radius (Screen)",
+    Default = 150,
+    Min = 10,
+    Max = 500,
+    Rounding = 0,
+    Tooltip = "Screen area where aim can lock (independent from FOV circle)",
+    Callback = function(v)
+        getgenv().Aimlock.Radius = v
+    end
+})
+
+AimBox:AddInput("AimMaxDistance", {
+    Default = "50",
+    Numeric = true,
+    Finished = true,
+    Text = "Max Distance (Studs)",
+    Tooltip = "Maximum world distance you can aim at",
+    Callback = function(Value)
+        local num = tonumber(Value)
+        if num and num > 0 then
+            getgenv().Aimlock.MaxDistance = num
+        end
+    end
+})
+
+-- ==================== UI - FOV ====================
+local FOVBox = Tabs.Combat:AddRightGroupbox("FOV", "circle")
+
+FOVBox:AddToggle("ShowFOV", {
+    Text = "Show FOV Circle",
+    Default = false,
+    Callback = function(v) getgenv().FOV.Enabled = v end
+})
+
+FOVBox:AddToggle("FOVFollowMouse", {
+    Text = "Follow Mouse",
+    Default = true,
+    Tooltip = "Off = center of screen",
+    Callback = function(v) getgenv().FOV.FollowMouse = v end
+})
+
+FOVBox:AddToggle("FOVOnlyWhenAiming", {
+    Text = "Only When Aiming",
+    Default = false,
+    Tooltip = "Only shows when aimlock is active",
+    Callback = function(v) getgenv().FOV.OnlyWhenAiming = v end
+})
+
+FOVBox:AddToggle("FOVFilled", {
+    Text = "FOV Filled",
+    Default = false,
+    Callback = function(v) getgenv().FOV.Filled = v end
+})
+
+FOVBox:AddToggle("FOVGlow", {
+    Text = "FOV Glow",
+    Default = false,
+    Tooltip = "Glow effect",
+    Callback = function(v) getgenv().FOV.Glow = v end
+})
+
+FOVBox:AddToggle("FOVRainbow", {
+    Text = "Rainbow FOV",
+    Default = false,
+    Callback = function(v) getgenv().FOV.Rainbow = v end
+})
+
+FOVBox:AddToggle("FOVPulse", {
+    Text = "Pulse Effect",
+    Default = false,
+    Tooltip = "FOV pulsates",
+    Callback = function(v) getgenv().FOV.Pulse = v end
+})
+
+FOVBox:AddToggle("FOVTargetColor", {
+    Text = "Change Color on Target",
+    Default = false,
+    Tooltip = "Changes color when targeting",
+    Callback = function(v) getgenv().FOV.TargetColor = v end
+})
+
+FOVBox:AddSlider("FOVSize", {
+    Text = "FOV Radius",
+    Default = 150,
+    Min = 10,
+    Max = 400,
+    Rounding = 0,
+    Callback = function(v)
+        getgenv().FOV.Radius = v
+    end
+})
+
+FOVBox:AddSlider("FOVThickness", {
+    Text = "Thickness",
+    Default = 1.6,
+    Min = 0.5,
+    Max = 5,
+    Rounding = 1,
+    Callback = function(v) getgenv().FOV.Thickness = v end
+})
+
+FOVBox:AddSlider("FOVTransparency", {
+    Text = "Outline Transparency",
+    Default = 0.15,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(v) getgenv().FOV.Transparency = v end
+})
+
+FOVBox:AddSlider("FOVFillTransparency", {
+    Text = "Fill Transparency",
+    Default = 0.7,
+    Min = 0,
+    Max = 1,
+    Rounding = 2,
+    Callback = function(v) getgenv().FOV.FillTransparency = v end
+})
+
+FOVBox:AddSlider("FOVNumSides", {
+    Text = "Circle Quality",
+    Default = 64,
+    Min = 12,
+    Max = 128,
+    Rounding = 0,
+    Tooltip = "More sides = smoother",
+    Callback = function(v) getgenv().FOV.NumSides = v end
+})
+
+FOVBox:AddLabel("FOV Color"):AddColorPicker("FOVColor", {
+    Default = Color3.fromRGB(255, 0, 70),
+    Callback = function(v) getgenv().FOV.Color = v end
+})
+
+FOVBox:AddLabel("Locked Color"):AddColorPicker("FOVLockedColor", {
+    Default = Color3.fromRGB(0, 255, 100),
+    Callback = function(v) getgenv().FOV.LockedColor = v end
+})
+
+print("[COMBAT] Aimlock + FOV (Mobile + Floating Button - All Features) loaded")
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -1570,6 +2257,649 @@ SettingsTab:AddLabel("4. Empty Bag → E → listo")
 
 print("[AUTOFARM] Marshmallow completo cargado")
 
+-- ==================== ANTI AFK ====================
+getgenv().AntiAFK = {
+    Enabled = true
+}
+
+-- Method 1: When the game detects idle
+LocalPlayer.Idled:Connect(function()
+    if getgenv().AntiAFK.Enabled then
+        pcall(function()
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+        end)
+    end
+end)
+
+-- Method 2: Safety loop (more reliable)
+task.spawn(function()
+    while true do
+        task.wait(math.random(45, 75)) -- Every 45-75 seconds
+        if getgenv().AntiAFK.Enabled then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+                
+                -- Small extra mouse movement
+                VIM:SendMouseMoveEvent(math.random(-2, 2), math.random(-2, 2), game)
+            end)
+        end
+    end
+end)
+
+local AntiAFKBox = MovementTab:AddLeftGroupbox("Anti AFK", "shield")
+
+AntiAFKBox:AddToggle("AntiAFKEnabled", {
+    Text = "Anti AFK",
+    Default = true,
+    Tooltip = "Prevents getting kicked for being AFK",
+    Callback = function(v)
+        getgenv().AntiAFK.Enabled = v
+        Library:Notify(v and "Anti AFK enabled" or "Anti AFK disabled", 2)
+    end
+})
+
+print("[ANTI AFK] Loaded")
+
+-- ==================== WALK SPEED + EXTRAS (Obsidian Tabbox) ====================
+getgenv().WalkSpeed = {
+    Enabled = false,
+    Speed = 16,
+
+    BoostEnabled = false,
+    BoostSpeed = 32,
+
+    AntiSit = false
+}
+
+local RunService = game:GetService("RunService")
+
+local WalkConnection = nil
+local AntiSitConnection = nil
+
+-- ==================== FUNCTIONS ====================
+local function StartWalkSpeed()
+    if WalkConnection then
+        WalkConnection:Disconnect()
+        WalkConnection = nil
+    end
+
+    WalkConnection = RunService.Heartbeat:Connect(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not root then return end
+
+        if hum.WalkSpeed ~= 16 then
+            hum.WalkSpeed = 16
+        end
+
+        local moveDir = hum.MoveDirection
+        if moveDir.Magnitude < 0.05 then return end
+
+        local targetSpeed = 16
+
+        if getgenv().WalkSpeed.Enabled then
+            targetSpeed = getgenv().WalkSpeed.Speed
+        end
+
+        if getgenv().WalkSpeed.BoostEnabled then
+            targetSpeed = getgenv().WalkSpeed.BoostSpeed
+        end
+
+        local currentVel = root.AssemblyLinearVelocity
+        local desiredVel = moveDir * targetSpeed
+        local newVel = Vector3.new(currentVel.X, 0, currentVel.Z):Lerp(desiredVel, 0.30)
+
+        root.AssemblyLinearVelocity = Vector3.new(newVel.X, currentVel.Y, newVel.Z)
+    end)
+end
+
+local function StopWalkSpeed()
+    if WalkConnection then
+        WalkConnection:Disconnect()
+        WalkConnection = nil
+    end
+end
+
+local function SetupAntiSit(char)
+    if AntiSitConnection then
+        AntiSitConnection:Disconnect()
+        AntiSitConnection = nil
+    end
+
+    local hum = char:WaitForChild("Humanoid", 4)
+    if not hum then return end
+
+    hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+
+    AntiSitConnection = hum.Seated:Connect(function(active)
+        if active and getgenv().WalkSpeed.AntiSit then
+            hum.Sit = false
+            task.defer(function()
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end)
+        end
+    end)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.35)
+    if getgenv().WalkSpeed.AntiSit then
+        SetupAntiSit(char)
+    end
+    if getgenv().WalkSpeed.Enabled or getgenv().WalkSpeed.BoostEnabled then
+        StartWalkSpeed()
+    end
+end)
+
+if LocalPlayer.Character and getgenv().WalkSpeed.AntiSit then
+    SetupAntiSit(LocalPlayer.Character)
+end
+
+-- ==================== UI (Obsidian Tabbox Style) ====================
+local SpeedTabBox = MovementTab:AddRightTabbox()
+
+--==================== TAB 1 - SPEED ====================
+local SpeedTab = SpeedTabBox:AddTab("Speed", "gauge")
+
+SpeedTab:AddToggle("WalkSpeedEnabled", {
+    Text = "Walk Speed",
+    Default = false,
+    Tooltip = "Applies while walking (stealth velocity)",
+    Callback = function(v)
+        getgenv().WalkSpeed.Enabled = v
+        if v or getgenv().WalkSpeed.BoostEnabled then
+            StartWalkSpeed()
+        else
+            StopWalkSpeed()
+        end
+    end
+})
+
+SpeedTab:AddSlider("WalkSpeedValue", {
+    Text = "Walk Speed Value",
+    Default = 16,
+    Min = 0,
+    Max = 50,
+    Rounding = 0,
+    Tooltip = "Speed when walking",
+    Callback = function(v)
+        getgenv().WalkSpeed.Speed = v
+    end
+})
+
+SpeedTab:AddDivider()
+
+SpeedTab:AddToggle("SpeedBoostEnabled", {
+    Text = "Speed Boost",
+    Default = false,
+    Tooltip = "Higher speed when enabled",
+    Callback = function(v)
+        getgenv().WalkSpeed.BoostEnabled = v
+        if v or getgenv().WalkSpeed.Enabled then
+            StartWalkSpeed()
+        else
+            StopWalkSpeed()
+        end
+    end
+})
+
+SpeedTab:AddSlider("SpeedBoostValue", {
+    Text = "Boost Speed Value",
+    Default = 32,
+    Min = 16,
+    Max = 55,
+    Rounding = 0,
+    Tooltip = "Speed when Boost is enabled",
+    Callback = function(v)
+        getgenv().WalkSpeed.BoostSpeed = v
+    end
+})
+
+--==================== TAB 2 - EXTRAS ====================
+local ExtrasTab = SpeedTabBox:AddTab("Extras", "shield")
+
+ExtrasTab:AddToggle("AntiSitEnabled", {
+    Text = "Anti Sit",
+    Default = false,
+    Tooltip = "Prevents being forced to sit",
+    Callback = function(v)
+        getgenv().WalkSpeed.AntiSit = v
+        if v and LocalPlayer.Character then
+            SetupAntiSit(LocalPlayer.Character)
+        end
+    end
+})
+
+print("[WALK SPEED + EXTRAS] Loaded")
+
+-- ==================== SHOW GUN (REAL-TIME + HIGH PERFORMANCE) ====================
+getgenv().ShowGun = {
+    Enabled = false,
+    MaxItems = 8,
+    TextSize = 13,
+    OffsetY = 2.7,
+    MaxDistance = 3000,
+
+    Highlight = {
+        -- ["NombreExacto"] = Color3.fromRGB(255, 215, 0),
+    },
+
+    Blacklist = {
+        "Phone", "Fist",
+        "Water", "Sugar Block Bag", "Gelatin", "Extended Clip", "Standard Clip", "Lock Pick", "Ghost Skull Face Half Mask", "Crate",
+        "Drum Magazine", "Large Marshmallow Bag", "Small Marshmallow Bag", "Black Gloves", "Shipmentbox", "Black Dripping Sorrow Mask",
+        "Empty Bag", "Medium Marshmallow Bag", "Crowbar", "Heavy Magazine", "Potato Chips", "Flour", "Potato", "Bandana", "Speed Loader",
+    },
+
+    Keywords = {
+        "Drum",
+    },
+
+    Rarity = {
+        Common     = Color3.fromRGB(255, 255, 255),
+        Epic       = Color3.fromRGB(170, 0, 255),
+        Destacado  = Color3.fromRGB(255, 50, 50),
+        Legendary  = Color3.fromRGB(135, 206, 250),
+    },
+
+    ItemRarity = {
+      ["PLR-16"] = "Legendary", ["ARP9"] = "Legendary", ["MPX"] = "Legendary", ["Honey Badger Pistol"] = "Legendary", ["DDM4 V7 Pistol"] = "Legendary",
+      ["AR Pistol"] = "Legendary", ["Draco"] = "Legendary", ["Tec-9"] = "Legendary", ["MCX"] = "Legendary", ["HK416"] = "Legendary", ["AK104 Pistol"] = "Legendary",
+      
+    }
+}
+
+local CoreGui = game:GetService("CoreGui")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Limpia folder viejo si existe (evita duplicados al re-ejecutar)
+local old = CoreGui:FindFirstChild("ShowGunESP")
+if old then old:Destroy() end
+
+local Folder = Instance.new("Folder")
+Folder.Name = "ShowGunESP"
+Folder.Parent = CoreGui
+
+local Billboards = {}
+local ItemLists = {}
+local Connections = {}
+
+-------------------------------------------------
+-- Utils
+-------------------------------------------------
+local function IsBlacklisted(name)
+    local lower = string.lower(tostring(name))
+    for _, v in ipairs(getgenv().ShowGun.Blacklist) do
+        if lower == string.lower(v) then return true end
+    end
+    return false
+end
+
+local function GetColor(items)
+    local best = getgenv().ShowGun.Rarity.Common
+    local prio = 0
+
+    for _, name in ipairs(items) do
+        for hName, color in pairs(getgenv().ShowGun.Highlight) do
+            if string.lower(name) == string.lower(hName) then
+                return color
+            end
+        end
+
+        for _, word in ipairs(getgenv().ShowGun.Keywords) do
+            if string.find(string.lower(name), string.lower(word)) and prio < 3 then
+                best = getgenv().ShowGun.Rarity.Destacado
+                prio = 3
+            end
+        end
+
+        local r = getgenv().ShowGun.ItemRarity[name]
+        if r == "Legendary" and prio < 2 then
+            best = getgenv().ShowGun.Rarity.Legendary
+            prio = 2
+        elseif r == "Epic" and prio < 1 then
+            best = getgenv().ShowGun.Rarity.Epic
+            prio = 1
+        elseif r == "Destacado" and prio < 3 then
+            best = getgenv().ShowGun.Rarity.Destacado
+            prio = 3
+        end
+    end
+    return best
+end
+
+local function BuildText(items)
+    if #items == 0 then return "" end
+    local text = "[ " .. table.concat(items, ", ") .. " ]"
+    if #text > 78 then
+        text = string.sub(text, 1, 75) .. "... ]"
+    end
+    return text
+end
+
+-------------------------------------------------
+-- Destroy (IMPORTANTE)
+-------------------------------------------------
+local function DestroyPlayer(player)
+    if Connections[player] then
+        for _, conn in ipairs(Connections[player]) do
+            pcall(function() conn:Disconnect() end)
+        end
+        Connections[player] = nil
+    end
+
+    if Billboards[player] then
+        pcall(function() Billboards[player]:Destroy() end)
+        Billboards[player] = nil
+    end
+
+    ItemLists[player] = nil
+end
+
+local function DestroyAll()
+    for player in pairs(Billboards) do
+        DestroyPlayer(player)
+    end
+    -- por si quedó algo suelto
+    for _, child in ipairs(Folder:GetChildren()) do
+        child:Destroy()
+    end
+end
+
+-------------------------------------------------
+-- Billboard
+-------------------------------------------------
+local function CreateBillboard(player)
+    if Billboards[player] then
+        Billboards[player]:Destroy()
+    end
+
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "SG_" .. player.Name
+    bb.AlwaysOnTop = true
+    bb.Size = UDim2.fromOffset(300, 20)
+    bb.StudsOffset = Vector3.new(0, getgenv().ShowGun.OffsetY, 0)
+    bb.MaxDistance = getgenv().ShowGun.MaxDistance
+    bb.Enabled = false
+    bb.Parent = Folder
+
+    local label = Instance.new("TextLabel")
+    label.Name = "Label"
+    label.BackgroundTransparency = 1
+    label.Size = UDim2.fromScale(1, 1)
+    label.Font = Enum.Font.GothamMedium
+    label.TextSize = getgenv().ShowGun.TextSize
+    label.TextColor3 = Color3.new(1, 1, 1)
+    label.TextStrokeTransparency = 0.4
+    label.TextStrokeColor3 = Color3.new(0, 0, 0)
+    label.Text = ""
+    label.Parent = bb
+
+    Billboards[player] = bb
+    return bb
+end
+
+local function RefreshLabel(player)
+    if not getgenv().ShowGun.Enabled then return end
+
+    local bb = Billboards[player]
+    if not bb or not bb.Parent then return end
+
+    local items = ItemLists[player] or {}
+    local label = bb:FindFirstChild("Label")
+    if not label then return end
+
+    if #items == 0 then
+        bb.Enabled = false
+        label.Text = ""
+        return
+    end
+
+    label.Text = BuildText(items)
+    label.TextColor3 = GetColor(items)
+    label.TextSize = getgenv().ShowGun.TextSize
+    bb.StudsOffset = Vector3.new(0, getgenv().ShowGun.OffsetY, 0)
+    bb.MaxDistance = getgenv().ShowGun.MaxDistance
+    bb.Enabled = true
+end
+
+-------------------------------------------------
+-- Inventory
+-------------------------------------------------
+local function RebuildItems(player)
+    if not getgenv().ShowGun.Enabled then return end
+
+    local list = {}
+    local seen = {}
+
+    local function add(name)
+        if not name or IsBlacklisted(name) then return end
+        local key = string.lower(name)
+        if seen[key] then return end
+        seen[key] = true
+        table.insert(list, name)
+    end
+
+    local char = player.Character
+    if char then
+        for _, obj in ipairs(char:GetChildren()) do
+            if obj:IsA("Tool") then add(obj.Name) end
+        end
+    end
+
+    local bp = player:FindFirstChild("Backpack")
+    if bp then
+        for _, obj in ipairs(bp:GetChildren()) do
+            if obj:IsA("Tool") then add(obj.Name) end
+        end
+    end
+
+    local max = getgenv().ShowGun.MaxItems or 8
+    if #list > max then
+        local limited = {}
+        for i = 1, max do limited[i] = list[i] end
+        list = limited
+    end
+
+    ItemLists[player] = list
+
+    if not Billboards[player] then
+        CreateBillboard(player)
+        local head = player.Character and (player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart"))
+        if head and Billboards[player] then
+            Billboards[player].Adornee = head
+        end
+    end
+
+    RefreshLabel(player)
+end
+
+local function SetupPlayer(player)
+    if player == LocalPlayer then return end
+    DestroyPlayer(player)
+
+    local conns = {}
+
+    local function onToolChanged()
+        if getgenv().ShowGun.Enabled then
+            RebuildItems(player)
+        end
+    end
+
+    local function hookCharacter(char)
+        table.insert(conns, char.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") then onToolChanged() end
+        end))
+        table.insert(conns, char.ChildRemoved:Connect(function(child)
+            if child:IsA("Tool") then onToolChanged() end
+        end))
+        onToolChanged()
+    end
+
+    if player.Character then
+        hookCharacter(player.Character)
+    end
+    table.insert(conns, player.CharacterAdded:Connect(function(char)
+        task.wait(0.25)
+        hookCharacter(char)
+        local bb = Billboards[player]
+        if bb then
+            local head = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart")
+            if head then bb.Adornee = head end
+        end
+        onToolChanged()
+    end))
+
+    local function hookBackpack()
+        local bp = player:FindFirstChild("Backpack")
+        if not bp then return end
+        table.insert(conns, bp.ChildAdded:Connect(function(child)
+            if child:IsA("Tool") then onToolChanged() end
+        end))
+        table.insert(conns, bp.ChildRemoved:Connect(function(child)
+            if child:IsA("Tool") then onToolChanged() end
+        end))
+    end
+
+    hookBackpack()
+    table.insert(conns, player.ChildAdded:Connect(function(child)
+        if child.Name == "Backpack" then
+            hookBackpack()
+            onToolChanged()
+        end
+    end))
+
+    Connections[player] = conns
+
+    if getgenv().ShowGun.Enabled then
+        CreateBillboard(player)
+        local head = player.Character and (player.Character:FindFirstChild("Head") or player.Character:FindFirstChild("HumanoidRootPart"))
+        if head and Billboards[player] then
+            Billboards[player].Adornee = head
+        end
+        RebuildItems(player)
+    end
+end
+
+-------------------------------------------------
+-- Init
+-------------------------------------------------
+for _, player in ipairs(Players:GetPlayers()) do
+    task.spawn(SetupPlayer, player)
+end
+
+Players.PlayerAdded:Connect(function(player)
+    task.defer(SetupPlayer, player)
+end)
+
+Players.PlayerRemoving:Connect(DestroyPlayer)
+
+-------------------------------------------------
+-- Enable / Disable (ARREGLADO)
+-------------------------------------------------
+local function SetEnabled(state)
+    getgenv().ShowGun.Enabled = state
+
+    if not state then
+        -- Destruir TODO al desactivar
+        DestroyAll()
+        return
+    end
+
+    -- Al activar: recrear para todos
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            SetupPlayer(player)
+        end
+    end
+end
+
+-------------------------------------------------
+-- UI
+-------------------------------------------------
+local ShowGunBox = Tabs.ESP:AddLeftGroupbox("Show Gun", "gun")
+
+ShowGunBox:AddToggle("ShowGunEnabled", {
+    Text = "Show Gun / Items",
+    Default = false,
+    Callback = function(v)
+        SetEnabled(v)
+    end
+})
+
+ShowGunBox:AddSlider("ShowGunMax", {
+    Text = "Max Items",
+    Default = 8,
+    Min = 1,
+    Max = 12,
+    Rounding = 0,
+    Callback = function(v) getgenv().ShowGun.MaxItems = v end
+})
+
+ShowGunBox:AddSlider("ShowGunSize", {
+    Text = "Text Size",
+    Default = 13,
+    Min = 10,
+    Max = 18,
+    Rounding = 0,
+    Callback = function(v)
+        getgenv().ShowGun.TextSize = v
+        for _, bb in pairs(Billboards) do
+            local label = bb:FindFirstChild("Label")
+            if label then label.TextSize = v end
+        end
+    end
+})
+
+ShowGunBox:AddSlider("ShowGunOffset", {
+    Text = "Height Offset",
+    Default = 2.7,
+    Min = 1.8,
+    Max = 4.5,
+    Rounding = 1,
+    Callback = function(v)
+        getgenv().ShowGun.OffsetY = v
+        for _, bb in pairs(Billboards) do
+            bb.StudsOffset = Vector3.new(0, v, 0)
+        end
+    end
+})
+
+ShowGunBox:AddSlider("ShowGunDistance", {
+    Text = "Max Distance",
+    Default = 300,
+    Min = 80,
+    Max = 800,
+    Rounding = 0,
+    Suffix = " studs",
+    Callback = function(v)
+        getgenv().ShowGun.MaxDistance = v
+        for _, bb in pairs(Billboards) do
+            bb.MaxDistance = v
+        end
+    end
+})
+
+-- Limpieza extra cuando se descarga la library
+if Library and Library.Unload then
+    local oldUnload = Library.Unload
+    Library.Unload = function(...)
+        getgenv().ShowGun.Enabled = false
+        DestroyAll()
+        if Folder and Folder.Parent then
+            Folder:Destroy()
+        end
+        return oldUnload(...)
+    end
+end
+
+print("[VISUALS] Show Gun Real-Time fixed cleanup loaded")
 -- ==================== FINAL ====================
 Library.ToggleKeybind = Options.MenuKeybind
 
