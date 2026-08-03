@@ -11,23 +11,23 @@ Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
 
 local Window = Library:CreateWindow({
-    Title = "mspaint",
-    Footer = "version: example",
-    Icon = 95816097006870,
+    Title = "Yx Studio's",
+    Footer = "1.0.0 Beta | Freemium | PC",
+    Icon = 135416919651671,
     NotifySide = "Right",
     ShowCustomCursor = true,
 })
 
 local Tabs = {
-    Combat = Window:AddTab("Combat", "sword"),
+    ["Combat"] = Window:AddTab("Combat", "sword"),
+    ["Movement"] = Window:AddTab("Movement", "footprints"),
     ESP = Window:AddTab("Player", "eye"),
-    Autofarm = Window:AddTab("Auto Farm", "eye"),
+    Autofarm = Window:AddTab("Auto Farm", "package"),
     ["UI Settings"] = Window:AddTab("Settings", "settings"),
 }
 
 -- ==================== TAB COMBAT ====================
--- ==================== COMBAT TAB - AIMLOCK + FOV AVANZADO ====================
-
+-- ==================== COMBAT TAB - AIMLOCK + ADVANCED FOV ====================
 getgenv().Aimlock = {
     Enabled = false,
     Aiming = false,
@@ -36,15 +36,15 @@ getgenv().Aimlock = {
     Radius = 150,
     MaxDistance = 1000,
     TeamCheck = false,
-    Predict = true,
+    Predict = false,          -- deshabilitado
     Prediction = 15,
-    Smooth = 0.14,
+    Smooth = 0,               -- deshabilitado
     AliveCheck = false,
     Airshot = false,
     Sticky = true,
-    WallCheck = true,
-    TargetIndicator = true,
-    AutoSwitch = true
+    WallCheck = false,        -- deshabilitado
+    TargetIndicator = false,  -- deshabilitado
+    AutoSwitch = false        -- deshabilitado
 }
 
 getgenv().FOV = {
@@ -58,10 +58,10 @@ getgenv().FOV = {
     NumSides = 64,
     Glow = false,
     Rainbow = false,
-    Pulse = false,
-    OnlyWhenAiming = false,
+    Pulse = false,            -- deshabilitado
+    OnlyWhenAiming = false,   -- deshabilitado
     FollowMouse = true,
-    TargetColor = true,
+    TargetColor = false,      -- deshabilitado
     LockedColor = Color3.fromRGB(0, 255, 100)
 }
 
@@ -70,7 +70,6 @@ local RunService = game:GetService("RunService")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
-
 local Target = nil
 local LockedTarget = nil
 
@@ -106,35 +105,30 @@ TargetHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
 TargetHighlight.Enabled = false
 TargetHighlight.Parent = game:GetService("CoreGui")
 
--- ==================== VARIABLES DE ANIMACIÓN ====================
+-- ==================== ANIMATION VARIABLES ====================
 local rainbowValue = 0
 local pulseValue = 0
 local pulseDirection = 1
 
--- ==================== FUNCIONES ====================
+-- ==================== FUNCTIONS ====================
 local function GetDistance(player)
     local myChar = LocalPlayer.Character
     local theirChar = player.Character
     if not myChar or not theirChar then return 999999 end
-
     local myRoot = myChar:FindFirstChild("HumanoidRootPart")
     local theirRoot = theirChar:FindFirstChild("HumanoidRootPart")
     if not myRoot or not theirRoot then return 999999 end
-
     return (myRoot.Position - theirRoot.Position).Magnitude
 end
 
 local function IsVisible(part)
     if not part then return false end
-
     local origin = Camera.CFrame.Position
     local direction = (part.Position - origin)
     local rayParams = RaycastParams.new()
     rayParams.FilterType = Enum.RaycastFilterType.Blacklist
     rayParams.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-
     local result = workspace:Raycast(origin, direction, rayParams)
-
     if result then
         local hitChar = result.Instance:FindFirstAncestorOfClass("Model")
         if hitChar and hitChar:FindFirstChild("Humanoid") then
@@ -142,20 +136,17 @@ local function IsVisible(part)
         end
         return false
     end
-
     return true
 end
 
 local function GetClosest()
     local closest = nil
     local dist = getgenv().Aimlock.Radius
-
     for _, plr in ipairs(Players:GetPlayers()) do
         if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
             if getgenv().Aimlock.TeamCheck and plr.Team == LocalPlayer.Team then
                 continue
             end
-
             local part = plr.Character:FindFirstChild(getgenv().Aimlock.Part) or plr.Character:FindFirstChild("Head")
             if part then
                 local sp, onscreen = Camera:WorldToViewportPoint(part.Position)
@@ -165,11 +156,9 @@ local function GetClosest()
                         if GetDistance(plr) > getgenv().Aimlock.MaxDistance then
                             continue
                         end
-
                         if getgenv().Aimlock.WallCheck and not IsVisible(part) then
                             continue
                         end
-
                         dist = d
                         closest = plr
                     end
@@ -180,10 +169,9 @@ local function GetClosest()
     return closest
 end
 
--- ==================== LOOP FOV ====================
+-- ==================== FOV LOOP ====================
 RunService.RenderStepped:Connect(function(dt)
     local cfg = getgenv().FOV
-
     local shouldShow = cfg.Enabled
 
     if cfg.OnlyWhenAiming then
@@ -245,7 +233,7 @@ RunService.RenderStepped:Connect(function(dt)
     end
 end)
 
--- ==================== LOOP AIMLOCK ====================
+-- ==================== AIMLOCK LOOP ====================
 RunService.Heartbeat:Connect(function()
     local keyActive = false
     if Options and Options.AimlockKey then
@@ -319,7 +307,7 @@ local AimBox = Tabs.Combat:AddLeftGroupbox("Aimlock (PC Only)", "sword")
 AimBox:AddToggle("AimlockEnabled", {
     Text = "Aim Assist",
     Default = false,
-    Tooltip = "Activa el aimlock",
+    Tooltip = "Activates aimlock",
     Callback = function(Value)
         getgenv().Aimlock.Enabled = Value
         if not Value then
@@ -362,28 +350,35 @@ AimBox:AddDropdown("AimPart", {
 AimBox:AddToggle("StickyAim", {
     Text = "Sticky Aim",
     Default = true,
-    Tooltip = "Se queda pegado al target",
+    Tooltip = "Stays locked on target",
     Callback = function(v) getgenv().Aimlock.Sticky = v end
 })
 
+-- ===== DESHABILITADOS (Premium) =====
 AimBox:AddToggle("WallCheck", {
     Text = "Wall Check",
-    Default = true,
-    Tooltip = "Solo apunta a jugadores visibles",
+    Default = false,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "Only aims at visible players",
     Callback = function(v) getgenv().Aimlock.WallCheck = v end
 })
 
 AimBox:AddToggle("AutoSwitch", {
     Text = "Auto Switch",
-    Default = true,
-    Tooltip = "Cambia de target cuando muere",
+    Default = false,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "Switches target when they die",
     Callback = function(v) getgenv().Aimlock.AutoSwitch = v end
 })
 
 AimBox:AddToggle("TargetIndicator", {
     Text = "Target Indicator",
-    Default = true,
-    Tooltip = "Resalta al jugador que estás apuntando",
+    Default = false,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "Highlights the player you're aiming at",
     Callback = function(v)
         getgenv().Aimlock.TargetIndicator = v
         if not v then
@@ -407,7 +402,9 @@ AimBox:AddToggle("AliveCheck", {
 
 AimBox:AddToggle("Prediction", {
     Text = "Prediction",
-    Default = true,
+    Default = false,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
     Callback = function(v) getgenv().Aimlock.Predict = v end
 })
 
@@ -419,10 +416,12 @@ AimBox:AddToggle("Airshot", {
 
 AimBox:AddSlider("Smoothness", {
     Text = "Smoothness",
-    Default = 0.14,
+    Default = 0,
     Min = 0,
     Max = 1,
     Rounding = 2,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
     Callback = function(v) getgenv().Aimlock.Smooth = v end
 })
 
@@ -432,17 +431,19 @@ AimBox:AddSlider("PredictionPower", {
     Min = 1,
     Max = 50,
     Rounding = 1,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
     Callback = function(v) getgenv().Aimlock.Prediction = v end
 })
 
 AimBox:AddSlider("AimMaxDistance", {
-    Text = "Aim Radius (Alcance)",
+    Text = "Aim Radius (Range)",
     Default = 1000,
     Min = 50,
     Max = 5000,
     Rounding = 0,
     Suffix = " studs",
-    Tooltip = "Distancia máxima a la que puede apuntar",
+    Tooltip = "Maximum distance you can aim at",
     Callback = function(v)
         getgenv().Aimlock.MaxDistance = v
     end
@@ -460,14 +461,16 @@ FOVBox:AddToggle("ShowFOV", {
 FOVBox:AddToggle("FOVFollowMouse", {
     Text = "Follow Mouse",
     Default = true,
-    Tooltip = "Apagado = centro de la pantalla",
+    Tooltip = "Off = center of screen",
     Callback = function(v) getgenv().FOV.FollowMouse = v end
 })
 
 FOVBox:AddToggle("FOVOnlyWhenAiming", {
     Text = "Only When Aiming",
     Default = false,
-    Tooltip = "Solo se muestra cuando el aimlock está activo",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "Only shows when aimlock is active",
     Callback = function(v) getgenv().FOV.OnlyWhenAiming = v end
 })
 
@@ -480,7 +483,7 @@ FOVBox:AddToggle("FOVFilled", {
 FOVBox:AddToggle("FOVGlow", {
     Text = "FOV Glow",
     Default = false,
-    Tooltip = "Efecto de brillo",
+    Tooltip = "Glow effect",
     Callback = function(v) getgenv().FOV.Glow = v end
 })
 
@@ -493,14 +496,18 @@ FOVBox:AddToggle("FOVRainbow", {
 FOVBox:AddToggle("FOVPulse", {
     Text = "Pulse Effect",
     Default = false,
-    Tooltip = "El FOV late",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "FOV pulsates",
     Callback = function(v) getgenv().FOV.Pulse = v end
 })
 
 FOVBox:AddToggle("FOVTargetColor", {
     Text = "Change Color on Target",
-    Default = true,
-    Tooltip = "Cambia de color al tener target",
+    Default = false,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "Changes color when targeting",
     Callback = function(v) getgenv().FOV.TargetColor = v end
 })
 
@@ -549,7 +556,7 @@ FOVBox:AddSlider("FOVNumSides", {
     Min = 12,
     Max = 128,
     Rounding = 0,
-    Tooltip = "Más lados = más suave",
+    Tooltip = "More sides = smoother",
     Callback = function(v) getgenv().FOV.NumSides = v end
 })
 
@@ -563,7 +570,7 @@ FOVBox:AddLabel("Locked Color"):AddColorPicker("FOVLockedColor", {
     Callback = function(v) getgenv().FOV.LockedColor = v end
 })
 
-print("[COMBAT] Aimlock + FOV + Aim Radius (Alcance) cargado")
+print("[COMBAT] Aimlock + FOV loaded (Free version - some features locked)")
 
 -- ==================== TAB ESP ====================
 local ESPLeftGroup = Tabs.ESP:AddLeftGroupbox("ESP - V1", "eye")
@@ -636,13 +643,13 @@ ESP1LeftGroup:AddButton({
         end
 
         if typeof(selected) ~= "string" or selected == "" or selected == "None" then
-            Library:Notify("Selecciona un jugador válido", 3)
+            Library:Notify("Select a valid player", 3)
             return
         end
 
         for _, name in ipairs(getgenv().FriendList) do
             if name == selected then
-                Library:Notify(selected .. " ya es amigo", 3)
+                Library:Notify(selected .. " is already a friend", 3)
                 return
             end
         end
@@ -855,7 +862,7 @@ end)
 
 task.delay(1, RefreshFriendDropdown)
 
-print("[SISTEMA ESP] Name ESP cargado correctamente")
+print("[ESP SYSTEM] Name ESP loaded successfully")
 
 local ESPRightGroup = Tabs.ESP:AddRightGroupbox("ESP - V2", "box")
 
@@ -1147,7 +1154,7 @@ Players.PlayerRemoving:Connect(function(player)
     RemoveBox2D(player)
 end)
 
-print("[SISTEMA ESP] Box ESP 3D + 2D cargado")
+print("[ESP SYSTEM] Box ESP 3D + 2D loaded")
 
 -- ==================== UI SETTINGS ====================
 local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu", "wrench")
@@ -1220,11 +1227,533 @@ MenuGroup:AddButton({
         end
         Library:Unload()
     end,
-    Tooltip = "Cierra el menú y desactiva todas las funciones",
+    Tooltip = "Closes the menu and disables all functions",
 })
 
--- ==================== MOVEMENT TAB ====================
+
+-- ==================== AUTOFARM - MARSHMALLOW ====================
+getgenv().MarshFarm = {
+    Enabled = false,
+    Running = false,
+    WaitAfterWater = 20,
+    WaitAfterGelatin = 45,
+    NotifyEnabled = true,
+    NotifyCooldown = 0.8,
+    Water = "Water",
+    SugarBlock = "Sugar Block Bag",
+    Gelatin = "Gelatin",
+    EmptyBag = "Empty Bag"
+}
+
+local lastNotify = 0
+
+local function Notify(title, text, time)
+    if not getgenv().MarshFarm.NotifyEnabled then return end
+    if tick() - lastNotify < (getgenv().MarshFarm.NotifyCooldown or 0.8) then return end
+    lastNotify = tick()
+    if Library and Library.Notify then
+        Library:Notify({ Title = title, Description = text, Time = time or 3 })
+    else
+        print("[AutoFarm]", title, "-", text)
+    end
+end
+
+local function PlaySuccessSound()
+    local s = Instance.new("Sound")
+    s.SoundId = "rbxassetid://6026984224"
+    s.Volume = 1.5
+    s.Parent = game:GetService("SoundService")
+    s:Play()
+    s.Ended:Connect(function() s:Destroy() end)
+end
+
+local function PressE()
+    for i = 1, 3 do
+        pcall(function()
+            game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+        end)
+        task.wait(0.07)
+        pcall(function()
+            game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        end)
+        task.wait(0.06)
+    end
+end
+
+local function FindTool(name)
+    local char = LocalPlayer.Character
+    local bag = LocalPlayer:FindFirstChild("Backpack")
+    if char then
+        for _, v in ipairs(char:GetChildren()) do
+            if v:IsA("Tool") and v.Name:lower() == name:lower() then
+                return v
+            end
+        end
+    end
+    if bag then
+        for _, v in ipairs(bag:GetChildren()) do
+            if v:IsA("Tool") and v.Name:lower() == name:lower() then
+                return v
+            end
+        end
+    end
+    return nil
+end
+
+local function CountTool(name)
+    local count = 0
+    local char = LocalPlayer.Character
+    local bag = LocalPlayer:FindFirstChild("Backpack")
+    if char then
+        for _, v in ipairs(char:GetChildren()) do
+            if v:IsA("Tool") and v.Name:lower() == name:lower() then
+                count += 1
+            end
+        end
+    end
+    if bag then
+        for _, v in ipairs(bag:GetChildren()) do
+            if v:IsA("Tool") and v.Name:lower() == name:lower() then
+                count += 1
+            end
+        end
+    end
+    return count
+end
+
+local function EquipTool(name)
+    for attempt = 1, 3 do
+        local tool = FindTool(name)
+        if not tool then return false end
+        local char = LocalPlayer.Character
+        local bag = LocalPlayer:FindFirstChild("Backpack")
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if not char or not bag or not hum then return false end
+        if tool.Parent == char then return true end
+        for _, v in ipairs(char:GetChildren()) do
+            if v:IsA("Tool") then v.Parent = bag end
+        end
+        task.wait(0.12)
+        tool.Parent = char
+        task.wait(0.2)
+        if tool.Parent == char then return true end
+        pcall(function() hum:EquipTool(tool) end)
+        task.wait(0.2)
+        if tool.Parent == char then return true end
+    end
+    return false
+end
+
+local function HasItems()
+    local missing = {}
+    if not FindTool(getgenv().MarshFarm.Water) then table.insert(missing, "Water") end
+    if not FindTool(getgenv().MarshFarm.SugarBlock) then table.insert(missing, "Sugar Block Bag") end
+    if not FindTool(getgenv().MarshFarm.Gelatin) then table.insert(missing, "Gelatin") end
+    return #missing == 0, missing
+end
+
+local function GetMaxCycles()
+    local water = CountTool(getgenv().MarshFarm.Water)
+    local sugar = CountTool(getgenv().MarshFarm.SugarBlock)
+    local gelatin = CountTool(getgenv().MarshFarm.Gelatin)
+    return math.min(water, sugar, gelatin)
+end
+
+local function FormatTime(seconds)
+    seconds = math.floor(seconds)
+    local mins = math.floor(seconds / 60)
+    local secs = seconds % 60
+    if mins > 0 then
+        return string.format("%d min %d sec", mins, secs)
+    else
+        return string.format("%d sec", secs)
+    end
+end
+
+local function GetTimePerCycle()
+    return getgenv().MarshFarm.WaitAfterWater + getgenv().MarshFarm.WaitAfterGelatin + 3
+end
+
+local function FarmLoop()
+    if getgenv().MarshFarm.Running then return end
+    getgenv().MarshFarm.Running = true
+
+    local cycle = 0
+    local maxCycles = GetMaxCycles()
+    local timePerCycle = GetTimePerCycle()
+    local totalSeconds = maxCycles * timePerCycle
+    local startTime = tick()
+
+    Notify("Auto Farm", "Farm started | " .. maxCycles .. " cycles | " .. FormatTime(totalSeconds), 5)
+
+    while getgenv().MarshFarm.Enabled and getgenv().MarshFarm.Running do
+        local ok, missing = HasItems()
+
+        if not ok then
+            Notify("Auto Farm", "Attempting cycle recovery...", 3)
+            local recovered = false
+
+            if FindTool(getgenv().MarshFarm.EmptyBag) then
+                if EquipTool(getgenv().MarshFarm.EmptyBag) then
+                    task.wait(0.35)
+                    PressE()
+                    task.wait(0.5)
+                    Notify("Auto Farm", "Empty Bag used (recovery)", 2)
+                    recovered = true
+                end
+            end
+
+            if not recovered and FindTool(getgenv().MarshFarm.SugarBlock) then
+                if EquipTool(getgenv().MarshFarm.SugarBlock) then
+                    task.wait(0.35)
+                    PressE()
+                    task.wait(0.4)
+                    Notify("Auto Farm", "Sugar Block Bag used (recovery)", 2)
+                    recovered = true
+                end
+            end
+
+            if not recovered and FindTool(getgenv().MarshFarm.Water) then
+                if EquipTool(getgenv().MarshFarm.Water) then
+                    task.wait(0.35)
+                    PressE()
+                    Notify("Auto Farm", "Water used (recovery) → waiting " .. getgenv().MarshFarm.WaitAfterWater .. "s", 3)
+                    local waterEnd = tick() + getgenv().MarshFarm.WaitAfterWater
+                    while tick() < waterEnd do
+                        if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
+                        task.wait(0.3)
+                    end
+                    recovered = true
+                end
+            end
+
+            if not recovered and FindTool(getgenv().MarshFarm.Gelatin) then
+                if EquipTool(getgenv().MarshFarm.Gelatin) then
+                    task.wait(0.35)
+                    PressE()
+                    Notify("Auto Farm", "Gelatin used (recovery) → waiting " .. getgenv().MarshFarm.WaitAfterGelatin .. "s", 3)
+                    local gelEnd = tick() + getgenv().MarshFarm.WaitAfterGelatin
+                    while tick() < gelEnd do
+                        if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
+                        task.wait(0.3)
+                    end
+                    recovered = true
+                end
+            end
+
+            if not recovered then
+                Notify("Auto Farm", "Items missing: " .. table.concat(missing, ", "), 5)
+                break
+            end
+
+            task.wait(0.8)
+        else
+            cycle += 1
+            local remainingCycles = math.max(maxCycles - cycle, 0)
+            local remainingTime = remainingCycles * timePerCycle
+
+            Notify("Auto Farm", string.format(
+                "Cycle #%d / %d\nRemaining time: %s",
+                cycle, maxCycles, FormatTime(remainingTime)
+            ), 3)
+
+            if EquipTool(getgenv().MarshFarm.Water) then
+                task.wait(0.35)
+                PressE()
+                Notify("Auto Farm", "Water → waiting " .. getgenv().MarshFarm.WaitAfterWater .. "s", 3)
+                local waterEnd = tick() + getgenv().MarshFarm.WaitAfterWater
+                while tick() < waterEnd do
+                    if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
+                    task.wait(0.3)
+                end
+            end
+            if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
+
+            if EquipTool(getgenv().MarshFarm.SugarBlock) then
+                task.wait(0.35)
+                PressE()
+                Notify("Auto Farm", "Sugar Block Bag used", 2)
+                task.wait(0.4)
+            end
+            if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
+
+            if EquipTool(getgenv().MarshFarm.Gelatin) then
+                task.wait(0.35)
+                PressE()
+                Notify("Auto Farm", "Gelatin → waiting " .. getgenv().MarshFarm.WaitAfterGelatin .. "s", 3)
+                local gelEnd = tick() + getgenv().MarshFarm.WaitAfterGelatin
+                while tick() < gelEnd do
+                    if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
+                    task.wait(0.3)
+                end
+            end
+            if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
+
+            if FindTool(getgenv().MarshFarm.EmptyBag) then
+                if EquipTool(getgenv().MarshFarm.EmptyBag) then
+                    task.wait(0.35)
+                    PressE()
+                    task.wait(0.45)
+                end
+            end
+
+            PlaySuccessSound()
+            Notify("Marshmallow ✓", "Cycle #" .. cycle .. " completed", 3)
+            task.wait(0.8)
+        end
+    end
+
+    local elapsed = tick() - startTime
+    getgenv().MarshFarm.Running = false
+    Notify("Auto Farm", "Farm stopped | Cycles: " .. cycle .. " | Real time: " .. FormatTime(elapsed), 5)
+end
+
+local function StartFarm()
+    if not getgenv().MarshFarm.Enabled then
+        Notify("Auto Farm", "You must enable 'Auto Farm Enabled' first", 3)
+        return
+    end
+    if getgenv().MarshFarm.Running then
+        Notify("Auto Farm", "Already running", 2)
+        return
+    end
+
+    local ok, missing = HasItems()
+    if not ok then
+        Notify("Auto Farm", "Missing items: " .. table.concat(missing, ", "), 4)
+        return
+    end
+
+    local maxCycles = GetMaxCycles()
+    local totalSeconds = maxCycles * GetTimePerCycle()
+    Notify("Auto Farm", string.format(
+        "Ingredients detected → %d cycles\nEstimated time: %s",
+        maxCycles, FormatTime(totalSeconds)
+    ), 6)
+
+    task.spawn(FarmLoop)
+end
+
+local function StopFarm()
+    if not getgenv().MarshFarm.Running then
+        Notify("Auto Farm", "Not running", 2)
+        return
+    end
+    getgenv().MarshFarm.Running = false
+    Notify("Auto Farm", "Stopping farm...", 2)
+end
+
+-- ==================== UI (TODO DESHABILITADO - PREMIUM) ====================
+local AutoFarmTab = Tabs.Autofarm
+local MarshTabBox = AutoFarmTab:AddLeftTabbox()
+local ControlsTab = MarshTabBox:AddTab("Controls", "play")
+local SettingsTab = MarshTabBox:AddTab("Settings", "settings")
+
+ControlsTab:AddToggle("MarshFarmToggle", {
+    Text = "Auto Farm Enabled",
+    Default = false,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "You MUST enable this to use Start, Stop or the Keybind",
+    Callback = function(Value)
+        getgenv().MarshFarm.Enabled = Value
+        if not Value then
+            getgenv().MarshFarm.Running = false
+        end
+    end
+})
+
+ControlsTab:AddDivider()
+
+ControlsTab:AddButton({
+    Text = "Start",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Func = function()
+        StartFarm()
+    end
+})
+
+ControlsTab:AddButton({
+    Text = "Stop",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Func = function()
+        StopFarm()
+    end
+})
+
+ControlsTab:AddDivider()
+
+ControlsTab:AddLabel("Keybind"):AddKeyPicker("MarshFarmKey", {
+    Default = "None",
+    Mode = "Press",
+    Text = "Start / Stop Farm",
+    NoUI = false,
+    SyncToggleState = false,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Callback = function()
+        if not getgenv().MarshFarm.Enabled then
+            Notify("Auto Farm", "You must enable 'Auto Farm Enabled' first", 2)
+            return
+        end
+        if getgenv().MarshFarm.Running then
+            StopFarm()
+        else
+            StartFarm()
+        end
+    end
+})
+
+SettingsTab:AddSlider("WaitWater", {
+    Text = "Wait after Water",
+    Default = 20,
+    Min = 5,
+    Max = 60,
+    Rounding = 0,
+    Suffix = "s",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Callback = function(Value)
+        getgenv().MarshFarm.WaitAfterWater = Value
+    end
+})
+
+SettingsTab:AddSlider("WaitGelatin", {
+    Text = "Wait after Gelatin",
+    Default = 45,
+    Min = 10,
+    Max = 120,
+    Rounding = 0,
+    Suffix = "s",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Callback = function(Value)
+        getgenv().MarshFarm.WaitAfterGelatin = Value
+    end
+})
+
+SettingsTab:AddDivider()
+
+SettingsTab:AddToggle("MarshNotifyToggle", {
+    Text = "Enable Notifications",
+    Default = true,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Callback = function(Value)
+        getgenv().MarshFarm.NotifyEnabled = Value
+    end
+})
+
+SettingsTab:AddSlider("NotifyCooldown", {
+    Text = "Notify Cooldown",
+    Default = 0.8,
+    Min = 0.3,
+    Max = 5,
+    Rounding = 1,
+    Suffix = "s",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Callback = function(Value)
+        getgenv().MarshFarm.NotifyCooldown = Value
+    end
+})
+
+SettingsTab:AddDivider()
+SettingsTab:AddLabel("1. Water → E → wait")
+SettingsTab:AddLabel("2. Sugar Block Bag → E (instant)")
+SettingsTab:AddLabel("3. Gelatin → E → wait")
+SettingsTab:AddLabel("4. Empty Bag → E → done")
+
+print("[AUTOFARM] Marshmallow loaded (Premium Feature - Fully Locked)")
+
+-- ==================== MINI SKIP ====================
+getgenv().MiniSkip = {
+    Distance = 5,
+    Cooldown = 0.3
+}
+
+local lastSkip = 0
+
+local function DoMiniSkip()
+    if tick() - lastSkip < (getgenv().MiniSkip.Cooldown or 0.3) then return end
+    lastSkip = tick()
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+
+    local look = root.CFrame.LookVector
+    local dist = getgenv().MiniSkip.Distance or 5
+    local newPos = root.Position + (look * dist)
+
+    root.CFrame = CFrame.new(newPos, newPos + look)
+end
+
+-- UI
 local MovementTab = Tabs.Movement
+local SkipBox = MovementTab:AddLeftGroupbox("Mini Skip", "move")
+
+SkipBox:AddSlider("MiniSkipDistance", {
+    Text = "Distance",
+    Default = 5,
+    Min = 1,
+    Max = 10,
+    Rounding = 0,
+    Suffix = " studs",
+    Callback = function(Value)
+        getgenv().MiniSkip.Distance = Value
+    end
+})
+
+SkipBox:AddButton({
+    Text = "Skip Now",
+    Func = function()
+        DoMiniSkip()
+    end,
+    Tooltip = "Moves you slightly forward"
+})
+
+SkipBox:AddLabel("Keybind"):AddKeyPicker("MiniSkipKey", {
+    Default = "None",
+    Mode = "Press",
+    Text = "Mini Skip",
+    NoUI = false,
+    SyncToggleState = false,
+    Callback = function()
+        DoMiniSkip()
+    end
+})
+
+SkipBox:AddButton({
+    Text = "Reset Key",
+    Func = function()
+        if Options and Options.MiniSkipKey then
+            Options.MiniSkipKey:SetValue({ "None", "Press" })
+            Library:Notify("Mini Skip keybind reset", 3)
+        end
+    end,
+    Tooltip = "Sets keybind to None"
+})
+
+print("[AUTOFARM] Mini Skip loaded")
+
+-- ==================== SERVICES & UTILS ====================
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local VIM = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
+
+local function GetRoot()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    return char:FindFirstChild("HumanoidRootPart") 
+        or char:FindFirstChild("Torso") 
+        or char:FindFirstChild("UpperTorso")
+end
 
 -- ==================== PRESS FAST ====================
 getgenv().PressFast = {
@@ -1335,7 +1864,9 @@ local PressBox = MovementTab:AddLeftGroupbox("Press Fast", "zap")
 PressBox:AddToggle("PressFastEnabled", {
     Text = "Fast Proximity Prompt",
     Default = false,
-    Tooltip = "Reduce el tiempo de hold de todos los ProximityPrompts",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "Reduces the hold time of all ProximityPrompts",
     Callback = function(v)
         getgenv().PressFast.Enabled = v
         if v then
@@ -1355,6 +1886,8 @@ PressBox:AddSlider("PressFastHoldTime", {
     Max = 1,
     Rounding = 2,
     Suffix = "s",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
     Callback = function(v)
         getgenv().PressFast.HoldTime = v
         if getgenv().PressFast.Enabled then
@@ -1369,15 +1902,15 @@ PressBox:AddButton({
     Text = "Force Respawn",
     Func = function()
         ForceRespawn()
-        Library:Notify("Respawn forzado", 2)
+        Library:Notify("Forced Respawn", 2)
     end,
-    Tooltip = "Te mata para respawnear"
+    Tooltip = "Kills you to force a respawn"
 })
 
 PressBox:AddToggle("PressFastTeleportOnRespawn", {
     Text = "Teleport on Respawn",
     Default = false,
-    Tooltip = "Al respawnear te lleva automáticamente al Died Point",
+    Tooltip = "Automatically teleports you to the Died Point when you respawn",
     Callback = function(v)
         getgenv().PressFast.TeleportOnRespawn = v
     end
@@ -1387,168 +1920,7 @@ if LocalPlayer.Character then
     SetupDiedConnection()
 end
 
-print("[PRESS FAST] Cargado en Movement")
-
--- ==================== MINI SKIP ====================
-getgenv().MiniSkip = {
-    Distance = 5,
-    Cooldown = 0.3,
-    ShowFloatingButton = false
-}
-
-local lastSkip = 0
-local FloatingButtonGui = nil
-
-local function DoMiniSkip()
-    if tick() - lastSkip < (getgenv().MiniSkip.Cooldown or 0.3) then return end
-    lastSkip = tick()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    local look = root.CFrame.LookVector
-    local dist = getgenv().MiniSkip.Distance or 5
-    local newPos = root.Position + (look * dist)
-    root.CFrame = CFrame.new(newPos, newPos + look)
-end
-
-local function CreateFloatingButton()
-    if FloatingButtonGui then
-        FloatingButtonGui:Destroy()
-        FloatingButtonGui = nil
-    end
-
-    local screenGui = Instance.new("ScreenGui")
-    screenGui.Name = "MiniSkipFloating"
-    screenGui.ResetOnSpawn = false
-    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    screenGui.IgnoreGuiInset = true
-    screenGui.Parent = CoreGui
-
-    local frame = Instance.new("Frame")
-    frame.Name = "SkipFrame"
-    frame.Size = UDim2.new(0, 95, 0, 42)
-    frame.Position = UDim2.new(1, -115, 1, -160)
-    frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    frame.BackgroundTransparency = 0.05
-    frame.BorderSizePixel = 0
-    frame.Parent = screenGui
-
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = frame
-
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = Color3.fromRGB(60, 60, 70)
-    stroke.Thickness = 1
-    stroke.Transparency = 0.3
-    stroke.Parent = frame
-
-    local button = Instance.new("TextButton")
-    button.Name = "SkipButton"
-    button.Size = UDim2.new(1, 0, 1, 0)
-    button.BackgroundTransparency = 1
-    button.Text = "Mini Skip"
-    button.TextColor3 = Color3.fromRGB(230, 230, 235)
-    button.TextSize = 14
-    button.Font = Enum.Font.GothamMedium
-    button.AutoButtonColor = false
-    button.Parent = frame
-
-    button.MouseEnter:Connect(function()
-        frame.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-    end)
-    button.MouseLeave:Connect(function()
-        frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
-    end)
-    button.MouseButton1Down:Connect(function()
-        frame.BackgroundColor3 = Color3.fromRGB(45, 45, 55)
-    end)
-    button.MouseButton1Up:Connect(function()
-        frame.BackgroundColor3 = Color3.fromRGB(35, 35, 42)
-    end)
-
-    local dragging = false
-    local dragStart = nil
-    local startPos = nil
-
-    button.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = frame.Position
-        end
-    end)
-
-    button.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = false
-        end
-    end)
-
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if dragging and (input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement) then
-            local delta = input.Position - dragStart
-            frame.Position = UDim2.new(
-                startPos.X.Scale,
-                startPos.X.Offset + delta.X,
-                startPos.Y.Scale,
-                startPos.Y.Offset + delta.Y
-            )
-        end
-    end)
-
-    button.MouseButton1Click:Connect(function()
-        DoMiniSkip()
-    end)
-
-    FloatingButtonGui = screenGui
-end
-
-local function DestroyFloatingButton()
-    if FloatingButtonGui then
-        FloatingButtonGui:Destroy()
-        FloatingButtonGui = nil
-    end
-end
-
-local SkipBox = MovementTab:AddLeftGroupbox("Mini Skip", "move")
-
-SkipBox:AddSlider("MiniSkipDistance", {
-    Text = "Distance",
-    Default = 5,
-    Min = 1,
-    Max = 10,
-    Rounding = 0,
-    Suffix = " studs",
-    Callback = function(Value)
-        getgenv().MiniSkip.Distance = Value
-    end
-})
-
-SkipBox:AddToggle("MiniSkipFloating", {
-    Text = "Show Floating Button",
-    Default = false,
-    Tooltip = "Muestra un botón permanente con el estilo de la Library",
-    Callback = function(Value)
-        getgenv().MiniSkip.ShowFloatingButton = Value
-        if Value then
-            CreateFloatingButton()
-        else
-            DestroyFloatingButton()
-        end
-    end
-})
-
-SkipBox:AddButton({
-    Text = "Skip Now",
-    Func = function()
-        DoMiniSkip()
-    end,
-    Tooltip = "Te mueve un poco hacia adelante"
-})
-
-print("[MINI SKIP] Cargado en Movement")
+print("[PRESS FAST] Loaded")
 
 -- ==================== AUTO LOOT + AUTO PRESS ====================
 getgenv().AutoLoot = {
@@ -1581,13 +1953,10 @@ end
 local function HoldPrompt(prompt)
     if IsHolding or not prompt then return end
     IsHolding = true
-
     local holdTime = math.max(prompt.HoldDuration or 0.5, 0.05)
-
     VIM:SendKeyEvent(true, getgenv().AutoLoot.Key, false, game)
     task.wait(holdTime)
     VIM:SendKeyEvent(false, getgenv().AutoLoot.Key, false, game)
-
     task.wait(0.08)
     IsHolding = false
 end
@@ -1597,10 +1966,8 @@ local function TryAutoInteract()
     if not getgenv().AutoLoot.Enabled and not getgenv().AutoLoot.AutoPressAny then
         return
     end
-
     local myRoot = GetRoot()
     if not myRoot then return end
-
     if tick() - LastCacheUpdate > 1.2 then
         UpdatePromptCache()
     end
@@ -1615,7 +1982,6 @@ local function TryAutoInteract()
                 if getgenv().AutoLoot.OnlyDead and not IsDead(char) then
                     continue
                 end
-
                 for _, obj in ipairs(char:GetDescendants()) do
                     if obj:IsA("ProximityPrompt") and obj.Enabled then
                         local part = obj.Parent
@@ -1662,25 +2028,29 @@ end)
 local LootBox = MovementTab:AddRightGroupbox("Auto Loot / Press", "backpack")
 
 LootBox:AddToggle("AutoLootEnabled", {
-    Text = "Auto Loot (Muertos)",
+    Text = "Auto Loot (Dead Players)",
     Default = false,
-    Tooltip = "Lootear automáticamente jugadores muertos cercanos",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "Automatically loots nearby dead players",
     Callback = function(v)
         getgenv().AutoLoot.Enabled = v
-        Library:Notify(v and "Auto Loot activado" or "Auto Loot desactivado", 2)
+        Library:Notify(v and "Auto Loot enabled" or "Auto Loot disabled", 2)
     end
 })
 
 LootBox:AddToggle("AutoPressAny", {
     Text = "Auto Press Any Prompt",
     Default = false,
-    Tooltip = "Mantiene presionada la E el tiempo completo del prompt y vuelve a hacerlo",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
+    Tooltip = "Holds the E key for the full prompt duration and repeats",
     Callback = function(v)
         getgenv().AutoLoot.AutoPressAny = v
         if v then
             UpdatePromptCache()
         end
-        Library:Notify(v and "Auto Press Any activado" or "Auto Press Any desactivado", 2)
+        Library:Notify(v and "Auto Press Any enabled" or "Auto Press Any disabled", 2)
     end
 })
 
@@ -1693,6 +2063,8 @@ LootBox:AddSlider("AutoLootDistance", {
     Max = 25,
     Rounding = 0,
     Suffix = " studs",
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
     Callback = function(v)
         getgenv().AutoLoot.MaxDistance = v
     end
@@ -1701,429 +2073,307 @@ LootBox:AddSlider("AutoLootDistance", {
 LootBox:AddToggle("AutoLootOnlyDead", {
     Text = "Only Dead Players",
     Default = true,
+    Disabled = true,
+    DisabledTooltip = "Premium Feature",
     Callback = function(v)
         getgenv().AutoLoot.OnlyDead = v
     end
 })
 
-print("[AUTO LOOT + AUTO PRESS] Cargado en Movement")
+print("[AUTO LOOT + AUTO PRESS] Loaded")
 
--- ==================== AUTOFARM - MARSHMALLOW (se queda en Auto Farm) ====================
-getgenv().MarshFarm = {
-    Enabled = false,
-    Running = false,
-    WaitAfterWater = 20,
-    WaitAfterGelatin = 45,
-    NotifyEnabled = true,
-    NotifyCooldown = 0.8,
-    Water = "Water",
-    SugarBlock = "Sugar Block Bag",
-    Gelatin = "Gelatin",
-    EmptyBag = "Empty Bag"
+-- ==================== ANTI AFK ====================
+getgenv().AntiAFK = {
+    Enabled = true
 }
 
-local lastNotify = 0
-
-local function Notify(title, text, time)
-    if not getgenv().MarshFarm.NotifyEnabled then return end
-    if tick() - lastNotify < (getgenv().MarshFarm.NotifyCooldown or 0.8) then return end
-    lastNotify = tick()
-    if Library and Library.Notify then
-        Library:Notify({ Title = title, Description = text, Time = time or 3 })
-    else
-        print("[AutoFarm]", title, "-", text)
-    end
-end
-
-local function PlaySuccessSound()
-    local s = Instance.new("Sound")
-    s.SoundId = "rbxassetid://6026984224"
-    s.Volume = 1.5
-    s.Parent = game:GetService("SoundService")
-    s:Play()
-    s.Ended:Connect(function() s:Destroy() end)
-end
-
-local function PressE()
-    for i = 1, 3 do
+-- Method 1: When the game detects idle
+LocalPlayer.Idled:Connect(function()
+    if getgenv().AntiAFK.Enabled then
         pcall(function()
-            VIM:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
         end)
-        task.wait(0.07)
-        pcall(function()
-            VIM:SendKeyEvent(false, Enum.KeyCode.E, false, game)
-        end)
-        task.wait(0.06)
     end
-end
+end)
 
-local function FindTool(name)
-    local char = LocalPlayer.Character
-    local bag = LocalPlayer:FindFirstChild("Backpack")
-    if char then
-        for _, v in ipairs(char:GetChildren()) do
-            if v:IsA("Tool") and v.Name:lower() == name:lower() then
-                return v
-            end
+-- Method 2: Safety loop (more reliable)
+task.spawn(function()
+    while true do
+        task.wait(math.random(45, 75)) -- Every 45-75 seconds
+        if getgenv().AntiAFK.Enabled then
+            pcall(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+                
+                -- Small extra mouse movement
+                VIM:SendMouseMoveEvent(math.random(-2, 2), math.random(-2, 2), game)
+            end)
         end
     end
-    if bag then
-        for _, v in ipairs(bag:GetChildren()) do
-            if v:IsA("Tool") and v.Name:lower() == name:lower() then
-                return v
-            end
-        end
-    end
-    return nil
-end
+end)
 
-local function CountTool(name)
-    local count = 0
-    local char = LocalPlayer.Character
-    local bag = LocalPlayer:FindFirstChild("Backpack")
-    if char then
-        for _, v in ipairs(char:GetChildren()) do
-            if v:IsA("Tool") and v.Name:lower() == name:lower() then
-                count += 1
-            end
-        end
-    end
-    if bag then
-        for _, v in ipairs(bag:GetChildren()) do
-            if v:IsA("Tool") and v.Name:lower() == name:lower() then
-                count += 1
-            end
-        end
-    end
-    return count
-end
+local AntiAFKBox = MovementTab:AddLeftGroupbox("Anti AFK", "shield")
 
-local function EquipTool(name)
-    for attempt = 1, 3 do
-        local tool = FindTool(name)
-        if not tool then return false end
-        local char = LocalPlayer.Character
-        local bag = LocalPlayer:FindFirstChild("Backpack")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if not char or not bag or not hum then return false end
-        if tool.Parent == char then return true end
-        for _, v in ipairs(char:GetChildren()) do
-            if v:IsA("Tool") then v.Parent = bag end
-        end
-        task.wait(0.12)
-        tool.Parent = char
-        task.wait(0.2)
-        if tool.Parent == char then return true end
-        pcall(function() hum:EquipTool(tool) end)
-        task.wait(0.2)
-        if tool.Parent == char then return true end
-    end
-    return false
-end
-
-local function HasItems()
-    local missing = {}
-    if not FindTool(getgenv().MarshFarm.Water) then table.insert(missing, "Water") end
-    if not FindTool(getgenv().MarshFarm.SugarBlock) then table.insert(missing, "Sugar Block Bag") end
-    if not FindTool(getgenv().MarshFarm.Gelatin) then table.insert(missing, "Gelatin") end
-    return #missing == 0, missing
-end
-
-local function GetMaxCycles()
-    local water = CountTool(getgenv().MarshFarm.Water)
-    local sugar = CountTool(getgenv().MarshFarm.SugarBlock)
-    local gelatin = CountTool(getgenv().MarshFarm.Gelatin)
-    return math.min(water, sugar, gelatin)
-end
-
-local function FormatTime(seconds)
-    seconds = math.floor(seconds)
-    local mins = math.floor(seconds / 60)
-    local secs = seconds % 60
-    if mins > 0 then
-        return string.format("%d min %d seg", mins, secs)
-    else
-        return string.format("%d seg", secs)
-    end
-end
-
-local function GetTimePerCycle()
-    return getgenv().MarshFarm.WaitAfterWater + getgenv().MarshFarm.WaitAfterGelatin + 3
-end
-
-local function FarmLoop()
-    if getgenv().MarshFarm.Running then return end
-    getgenv().MarshFarm.Running = true
-    local cycle = 0
-    local maxCycles = GetMaxCycles()
-    local timePerCycle = GetTimePerCycle()
-    local totalSeconds = maxCycles * timePerCycle
-    local startTime = tick()
-
-    Notify("Auto Farm", "Farm iniciado | " .. maxCycles .. " ciclos | " .. FormatTime(totalSeconds), 5)
-
-    while getgenv().MarshFarm.Enabled and getgenv().MarshFarm.Running do
-        local ok, missing = HasItems()
-        if not ok then
-            Notify("Auto Farm", "Intentando recuperar ciclo...", 3)
-            local recovered = false
-
-            if FindTool(getgenv().MarshFarm.EmptyBag) then
-                if EquipTool(getgenv().MarshFarm.EmptyBag) then
-                    task.wait(0.35)
-                    PressE()
-                    task.wait(0.5)
-                    Notify("Auto Farm", "Empty Bag usado (recuperación)", 2)
-                    recovered = true
-                end
-            end
-
-            if not recovered and FindTool(getgenv().MarshFarm.SugarBlock) then
-                if EquipTool(getgenv().MarshFarm.SugarBlock) then
-                    task.wait(0.35)
-                    PressE()
-                    task.wait(0.4)
-                    Notify("Auto Farm", "Sugar Block Bag usado (recuperación)", 2)
-                    recovered = true
-                end
-            end
-
-            if not recovered and FindTool(getgenv().MarshFarm.Water) then
-                if EquipTool(getgenv().MarshFarm.Water) then
-                    task.wait(0.35)
-                    PressE()
-                    Notify("Auto Farm", "Water usado (recuperación) → esperando " .. getgenv().MarshFarm.WaitAfterWater .. "s", 3)
-                    local waterEnd = tick() + getgenv().MarshFarm.WaitAfterWater
-                    while tick() < waterEnd do
-                        if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
-                        task.wait(0.3)
-                    end
-                    recovered = true
-                end
-            end
-
-            if not recovered and FindTool(getgenv().MarshFarm.Gelatin) then
-                if EquipTool(getgenv().MarshFarm.Gelatin) then
-                    task.wait(0.35)
-                    PressE()
-                    Notify("Auto Farm", "Gelatin usado (recuperación) → esperando " .. getgenv().MarshFarm.WaitAfterGelatin .. "s", 3)
-                    local gelEnd = tick() + getgenv().MarshFarm.WaitAfterGelatin
-                    while tick() < gelEnd do
-                        if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
-                        task.wait(0.3)
-                    end
-                    recovered = true
-                end
-            end
-
-            if not recovered then
-                Notify("Auto Farm", "No quedan items: " .. table.concat(missing, ", "), 5)
-                break
-            end
-            task.wait(0.8)
-        else
-            cycle += 1
-            local remainingCycles = math.max(maxCycles - cycle, 0)
-            local remainingTime = remainingCycles * timePerCycle
-
-            Notify("Auto Farm", string.format(
-                "Ciclo #%d / %d\nTiempo restante: %s",
-                cycle, maxCycles, FormatTime(remainingTime)
-            ), 3)
-
-            if EquipTool(getgenv().MarshFarm.Water) then
-                task.wait(0.35)
-                PressE()
-                Notify("Auto Farm", "Water → esperando " .. getgenv().MarshFarm.WaitAfterWater .. "s", 3)
-                local waterEnd = tick() + getgenv().MarshFarm.WaitAfterWater
-                while tick() < waterEnd do
-                    if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
-                    task.wait(0.3)
-                end
-            end
-
-            if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
-
-            if EquipTool(getgenv().MarshFarm.SugarBlock) then
-                task.wait(0.35)
-                PressE()
-                Notify("Auto Farm", "Sugar Block Bag usado", 2)
-                task.wait(0.4)
-            end
-
-            if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
-
-            if EquipTool(getgenv().MarshFarm.Gelatin) then
-                task.wait(0.35)
-                PressE()
-                Notify("Auto Farm", "Gelatin → esperando " .. getgenv().MarshFarm.WaitAfterGelatin .. "s", 3)
-                local gelEnd = tick() + getgenv().MarshFarm.WaitAfterGelatin
-                while tick() < gelEnd do
-                    if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
-                    task.wait(0.3)
-                end
-            end
-
-            if not getgenv().MarshFarm.Enabled or not getgenv().MarshFarm.Running then break end
-
-            if FindTool(getgenv().MarshFarm.EmptyBag) then
-                if EquipTool(getgenv().MarshFarm.EmptyBag) then
-                    task.wait(0.35)
-                    PressE()
-                    task.wait(0.45)
-                end
-            end
-
-            PlaySuccessSound()
-            Notify("Marshmallow ✓", "Ciclo #" .. cycle .. " completado", 3)
-            task.wait(0.8)
-        end
-    end
-
-    local elapsed = tick() - startTime
-    getgenv().MarshFarm.Running = false
-    Notify("Auto Farm", "Farm detenido | Ciclos: " .. cycle .. " | Tiempo real: " .. FormatTime(elapsed), 5)
-end
-
-local function StartFarm()
-    if not getgenv().MarshFarm.Enabled then
-        Notify("Auto Farm", "Debes activar 'Auto Farm Enabled' primero", 3)
-        return
-    end
-    if getgenv().MarshFarm.Running then
-        Notify("Auto Farm", "Ya está corriendo", 2)
-        return
-    end
-    local ok, missing = HasItems()
-    if not ok then
-        Notify("Auto Farm", "Faltan items: " .. table.concat(missing, ", "), 4)
-        return
-    end
-    local maxCycles = GetMaxCycles()
-    local totalSeconds = maxCycles * GetTimePerCycle()
-    Notify("Auto Farm", string.format(
-        "Ingredientes detectados → %d ciclos\nTiempo estimado: %s",
-        maxCycles, FormatTime(totalSeconds)
-    ), 6)
-    task.spawn(FarmLoop)
-end
-
-local function StopFarm()
-    if not getgenv().MarshFarm.Running then
-        Notify("Auto Farm", "No está corriendo", 2)
-        return
-    end
-    getgenv().MarshFarm.Running = false
-    Notify("Auto Farm", "Deteniendo farm...", 2)
-end
-
-local AutoFarmTab = Tabs.Autofarm
-local MarshTabBox = AutoFarmTab:AddLeftTabbox()
-local ControlsTab = MarshTabBox:AddTab("Controls", "play")
-local SettingsTab = MarshTabBox:AddTab("Settings", "settings")
-
-ControlsTab:AddToggle("MarshFarmToggle", {
-    Text = "Auto Farm Enabled",
-    Default = false,
-    Tooltip = "DEBES activar esto para poder usar Start, Stop o el Keybind",
-    Callback = function(Value)
-        getgenv().MarshFarm.Enabled = Value
-        if not Value then
-            getgenv().MarshFarm.Running = false
-        end
-    end
-})
-
-ControlsTab:AddDivider()
-
-ControlsTab:AddButton({
-    Text = "Start",
-    Func = function()
-        StartFarm()
-    end
-})
-
-ControlsTab:AddButton({
-    Text = "Stop",
-    Func = function()
-        StopFarm()
-    end
-})
-
-ControlsTab:AddDivider()
-
-ControlsTab:AddLabel("Keybind"):AddKeyPicker("MarshFarmKey", {
-    Default = "None",
-    Mode = "Press",
-    Text = "Start / Stop Farm",
-    NoUI = false,
-    SyncToggleState = false,
-    Callback = function()
-        if not getgenv().MarshFarm.Enabled then
-            Notify("Auto Farm", "Debes activar 'Auto Farm Enabled' primero", 2)
-            return
-        end
-        if getgenv().MarshFarm.Running then
-            StopFarm()
-        else
-            StartFarm()
-        end
-    end
-})
-
-SettingsTab:AddSlider("WaitWater", {
-    Text = "Espera después de Water",
-    Default = 20,
-    Min = 5,
-    Max = 60,
-    Rounding = 0,
-    Suffix = "s",
-    Callback = function(Value)
-        getgenv().MarshFarm.WaitAfterWater = Value
-    end
-})
-
-SettingsTab:AddSlider("WaitGelatin", {
-    Text = "Espera después de Gelatin",
-    Default = 45,
-    Min = 10,
-    Max = 120,
-    Rounding = 0,
-    Suffix = "s",
-    Callback = function(Value)
-        getgenv().MarshFarm.WaitAfterGelatin = Value
-    end
-})
-
-SettingsTab:AddDivider()
-
-SettingsTab:AddToggle("MarshNotifyToggle", {
-    Text = "Enable Notifications",
+AntiAFKBox:AddToggle("AntiAFKEnabled", {
+    Text = "Anti AFK",
     Default = true,
-    Callback = function(Value)
-        getgenv().MarshFarm.NotifyEnabled = Value
+    Tooltip = "Prevents getting kicked for being AFK",
+    Callback = function(v)
+        getgenv().AntiAFK.Enabled = v
+        Library:Notify(v and "Anti AFK enabled" or "Anti AFK disabled", 2)
     end
 })
 
-SettingsTab:AddSlider("NotifyCooldown", {
-    Text = "Notify Cooldown",
-    Default = 0.8,
-    Min = 0.3,
-    Max = 5,
-    Rounding = 1,
-    Suffix = "s",
-    Callback = function(Value)
-        getgenv().MarshFarm.NotifyCooldown = Value
+print("[ANTI AFK] Loaded")
+
+-- ==================== WALK SPEED + EXTRAS (Obsidian Tabbox) ====================
+getgenv().WalkSpeed = {
+    Enabled = false,
+    Speed = 16,
+
+    BoostEnabled = false,
+    BoostSpeed = 32,
+
+    Noclip = false,
+    AntiSit = false
+}
+
+local RunService = game:GetService("RunService")
+
+local WalkConnection = nil
+local NoclipConnection = nil
+local AntiSitConnection = nil
+
+-- ==================== FUNCTIONS ====================
+local function StartWalkSpeed()
+    if WalkConnection then
+        WalkConnection:Disconnect()
+        WalkConnection = nil
+    end
+
+    WalkConnection = RunService.Heartbeat:Connect(function()
+        local char = LocalPlayer.Character
+        if not char then return end
+
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local root = char:FindFirstChild("HumanoidRootPart")
+        if not hum or not root then return end
+
+        -- Stealth: always keep original WalkSpeed
+        if hum.WalkSpeed ~= 16 then
+            hum.WalkSpeed = 16
+        end
+
+        local moveDir = hum.MoveDirection
+        if moveDir.Magnitude < 0.05 then return end
+
+        local targetSpeed = 16
+
+        if getgenv().WalkSpeed.Enabled then
+            targetSpeed = getgenv().WalkSpeed.Speed
+        end
+
+        if getgenv().WalkSpeed.BoostEnabled then
+            targetSpeed = getgenv().WalkSpeed.BoostSpeed
+        end
+
+        local currentVel = root.AssemblyLinearVelocity
+        local desiredVel = moveDir * targetSpeed
+        local newVel = Vector3.new(currentVel.X, 0, currentVel.Z):Lerp(desiredVel, 0.30)
+
+        root.AssemblyLinearVelocity = Vector3.new(newVel.X, currentVel.Y, newVel.Z)
+    end)
+end
+
+local function StopWalkSpeed()
+    if WalkConnection then
+        WalkConnection:Disconnect()
+        WalkConnection = nil
+    end
+end
+
+-- ========== IMPROVED NOCLIP (Less Detectable) ==========
+local function StartNoclip()
+    if NoclipConnection then
+        NoclipConnection:Disconnect()
+        NoclipConnection = nil
+    end
+
+    NoclipConnection = RunService.Stepped:Connect(function()
+        if not getgenv().WalkSpeed.Noclip then return end
+
+        local char = LocalPlayer.Character
+        if not char then return end
+
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            -- Usa un estado más limpio
+            pcall(function()
+                hum:ChangeState(Enum.HumanoidStateType.StrafingNoPhysics)
+            end)
+        end
+
+        for _, part in ipairs(char:GetDescendants()) do
+            if part:IsA("BasePart") then
+                -- Solo cambia si realmente está en true (menos llamadas)
+                if part.CanCollide then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+end
+
+local function StopNoclip()
+    if NoclipConnection then
+        NoclipConnection:Disconnect()
+        NoclipConnection = nil
+    end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        pcall(function()
+            hum:ChangeState(Enum.HumanoidStateType.Running)
+        end)
+    end
+
+    -- Restaurar colisiones
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+            part.CanCollide = true
+        end
+    end
+end
+
+local function SetupAntiSit(char)
+    if AntiSitConnection then
+        AntiSitConnection:Disconnect()
+        AntiSitConnection = nil
+    end
+
+    local hum = char:WaitForChild("Humanoid", 4)
+    if not hum then return end
+
+    hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+
+    AntiSitConnection = hum.Seated:Connect(function(active)
+        if active and getgenv().WalkSpeed.AntiSit then
+            hum.Sit = false
+            task.defer(function()
+                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
+            end)
+        end
+    end)
+end
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    task.wait(0.35)
+    if getgenv().WalkSpeed.AntiSit then
+        SetupAntiSit(char)
+    end
+    if getgenv().WalkSpeed.Enabled or getgenv().WalkSpeed.BoostEnabled then
+        StartWalkSpeed()
+    end
+end)
+
+if LocalPlayer.Character and getgenv().WalkSpeed.AntiSit then
+    SetupAntiSit(LocalPlayer.Character)
+end
+
+-- ==================== UI (Obsidian Tabbox Style) ====================
+local SpeedTabBox = MovementTab:AddLeftTabbox()
+
+--==================== TAB 1 - SPEED ====================
+local SpeedTab = SpeedTabBox:AddTab("Speed")
+
+SpeedTab:AddToggle("WalkSpeedEnabled", {
+    Text = "Walk Speed",
+    Default = false,
+    Tooltip = "Applies while walking (stealth velocity)",
+    Callback = function(v)
+        getgenv().WalkSpeed.Enabled = v
+        if v or getgenv().WalkSpeed.BoostEnabled then
+            StartWalkSpeed()
+        else
+            StopWalkSpeed()
+        end
     end
 })
 
-SettingsTab:AddDivider()
-SettingsTab:AddLabel("1. Water → E → espera")
-SettingsTab:AddLabel("2. Sugar Block Bag → E (instantáneo)")
-SettingsTab:AddLabel("3. Gelatin → E → espera")
-SettingsTab:AddLabel("4. Empty Bag → E → listo")
+SpeedTab:AddSlider("WalkSpeedValue", {
+    Text = "Walk Speed Value",
+    Default = 16,
+    Min = 0,
+    Max = 50,
+    Rounding = 0,
+    Tooltip = "Speed when walking",
+    Callback = function(v)
+        getgenv().WalkSpeed.Speed = v
+    end
+})
 
-print("[AUTOFARM] Marshmallow completo cargado")
+SpeedTab:AddDivider()
+
+SpeedTab:AddToggle("SpeedBoostEnabled", {
+    Text = "Speed Boost",
+    Default = false,
+    Tooltip = "Higher speed when enabled",
+    Callback = function(v)
+        getgenv().WalkSpeed.BoostEnabled = v
+        if v or getgenv().WalkSpeed.Enabled then
+            StartWalkSpeed()
+        else
+            StopWalkSpeed()
+        end
+    end
+})
+
+SpeedTab:AddSlider("SpeedBoostValue", {
+    Text = "Boost Speed Value",
+    Default = 32,
+    Min = 16,
+    Max = 55,
+    Rounding = 0,
+    Tooltip = "Speed when Boost is enabled",
+    Callback = function(v)
+        getgenv().WalkSpeed.BoostSpeed = v
+    end
+})
+
+--==================== TAB 2 - EXTRAS ====================
+local ExtrasTab = SpeedTabBox:AddTab("Extras")
+
+ExtrasTab:AddToggle("NoclipEnabled", {
+    Text = "Noclip",
+    Default = false,
+    Tooltip = "Improved noclip (less detectable)",
+    Callback = function(v)
+        getgenv().WalkSpeed.Noclip = v
+        if v then
+            StartNoclip()
+        else
+            StopNoclip()
+        end
+    end
+})
+
+ExtrasTab:AddToggle("AntiSitEnabled", {
+    Text = "Anti Sit",
+    Default = false,
+    Tooltip = "Prevents being forced to sit",
+    Callback = function(v)
+        getgenv().WalkSpeed.AntiSit = v
+        if v and LocalPlayer.Character then
+            SetupAntiSit(LocalPlayer.Character)
+        end
+    end
+})
+
+print("[WALK SPEED + EXTRAS] Loaded - Improved Noclip")
 
 Library.ToggleKeybind = Options.MenuKeybind
 
