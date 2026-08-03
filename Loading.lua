@@ -10,7 +10,7 @@ local TweenService = game:GetService("TweenService")
 local Lighting = game:GetService("Lighting")
 
 -- CONFIGURATION
-local GITHUB_URL = "https://github.com/your-username/your-repository" -- Change this URL
+local GITHUB_URL = "https://raw.githubusercontent.com/personalbusiness2626-dotcom/YxStudios/refs/heads/main/Auth" -- Change this URL
 local LOGO_ID = "135416919651671" -- Logo ID
 local AUTHORIZED_PLACE_ID = 13643807539 -- FIXED ID for South Bronx game
 
