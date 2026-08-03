@@ -11,9 +11,9 @@ Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
 
 local Window = Library:CreateWindow({
-    Title = "mspaint",
-    Footer = "version: mobile (no aimlock)",
-    Icon = 95816097006870,
+    Title = "Yx Studio's",
+    Footer = "1.0.0 Beta | Freemium | MOBILE",
+    Icon = 135416919651671,
     NotifySide = "Right",
     ShowCustomCursor = false,
 })
