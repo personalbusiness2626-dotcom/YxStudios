@@ -1,21 +1,45 @@
-MIT License
+<p align="center">
+  <img src="https://raw.githubusercontent.com/yourusername/south-bronx-script/main/assets/banner.svg" alt="South Bronx Script Banner" width="100%">
+</p>
 
-Copyright (c) 2026 personalbusiness2626-dotcom
+<p align="center">
+  <img src="https://img.shields.io/badge/Python-3.8%2B-3776AB?style=for-the-badge&logo=python&logoColor=white">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Status-Active-brightgreen?style=for-the-badge">
+  <img src="https://img.shields.io/badge/Bronx-Proud-orange?style=for-the-badge">
+</p>
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+---
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+<!-- SVG BANNER ANIMADO -->
+<div align="center">
+  <img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&height=200&section=header&text=South%20Bronx%20Script&fontSize=60&fontAlignY=35&animation=fadeIn&desc=Built%20in%20the%20Boogie%20Down&descAlignY=55" width="100%"/>
+</div>
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+---
+
+## 🗽 **¿Qué es esto?**
+
+> Un script [describe tu script aquí] diseñado con la misma **resiliencia y flow** del South Bronx.
+
+---
+
+## 🎨 **Visual Preview**
+
+<p align="center">
+  <img src="https://via.placeholder.com/800x400/1a1a2e/ffffff?text=South+Bronx+Script+in+Action" alt="Demo Preview" width="80%">
+</p>
+
+---
+
+## 📦 **Instalación**
+
+```bash
+# Clona el repo
+git clone https://github.com/yourusername/south-bronx-script.git
+
+# Entra al directorio
+cd south-bronx-script
+
+# Instala dependencias
+pip install -r requirements.txt
