@@ -27,7 +27,6 @@
 
 ---
 
-<!-- VERSIONES DEL SCRIPT -->
 ## 📦 **Versiones del Script**
 
 <p align="center">
