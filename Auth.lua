@@ -17,7 +17,7 @@ getgenv().YX_TempExpiry = getgenv().YX_TempExpiry or nil
 
 -- ==================== CONFIG ====================
 local CONFIG = {
-    DiscordWebhook = "https://discord.com/api/webhooks/1453113715200102531/TRzVhwOYlF921oHphBfNIKP0LCwxcwLBfRCD0D1L00fg07Sofj6eSv-4jgt-xSdWHj6O",
+    DiscordWebhook = "https://discord.com/api/webhooks/1534681650024419588/6iuT_G5zL4Iv9xWbdktyZnrz1JoHVEirF25Te-JjydVOVMGCw0dbyh-MdttqcMnB6K0E",
     OwnerUserId = "3665809170",
     DiscordInvite = "F3SDzkZa6U",
 
